@@ -1,0 +1,84 @@
+//! account: bbchain, 1000000
+
+//! new-transaction
+//! sender: bbchain
+module OwnerGroup {
+    import 0x0.Signature;
+    import 0x0.Vector;
+
+    resource T {
+        // vector of public keys
+        // for simplicity just use the plain public key here. We could
+        // also use the hash here as how auth key works
+        pks: Vector.T<bytearray>,
+        signed_pks: Vector.T<bytearray>,
+
+        // the threshold policy
+        quorum: u64
+    }
+
+    // create a new approval group
+    public create(pks: Vector.T<bytearray>, quorum: u64): Self.T {
+        return T {
+            pks: Vector.empty<bytearray>(),
+            signed_pks: Vector.empty<bytearray>(),
+            quorum: 2
+        };
+    }
+
+    // check if quorom of signature has been reached
+    // public quorum_signed(group: &Self.T): bool{
+    //     let result: bool;
+    //     let total_signed: u64;
+
+    //     // count number of pks that signed
+    //     total_signed = Vector.length<bytearray>(&copy(group).signed_pks);
+        
+    //     if(copy(total_signed) >= &copy(group).quorum){
+    //         result = true;
+    //     }else{
+    //         result = false;
+    //     }
+
+    //     return move(result);
+    // }
+
+    // evaluate and append to valid signs
+    // public sign(group: &Self.T,
+    //                   pk: bytearray,
+    //                   sig: bytearray,
+    //                   hash: bytearray): bool {
+    //     let result: bool;
+    //     let pk_exists: bool;
+
+    //     // assert that the same pk hasnt signed before
+    //     // contains<Element>(v: &Self.T<Element>, e: &Element): bool {
+    //     pk_exists = Vector.contains<bytearray>(&copy(group).enrolledStudents, &copy(pk));
+    //     assert(copy(pk_exists) == false, 42);
+
+    //     // verify signature
+    //     result = Self.verify_sig(copy(group), move(pk), move(sig), copy(hash));
+
+    //     // record state in resource if signed
+    //     if(copy(result)){
+    //         Vector.push_back<bytearray>(&mut copy(group).signed_pks, move(pk));
+    //     }
+
+    //     return move(result);
+    // }
+
+    // // helper function to evaluate the pk and signature
+    // verify_sig(group: &Self.T, pk: bytearray, sig: bytearray, hash: bytearray): bool {
+    //     let result: bool;
+
+    //     if(Vector.contains<bytearray>(&copy(group).pks, &copy(pk))){
+    //         result = Signature.ed25519_verify(move(sig), move(pk), move(hash));
+    //     }else{
+    //         result = false
+    //     }
+
+    //     _ = move(group);
+    //     return move(result);
+    // }
+
+}

@@ -1,0 +1,59 @@
+//! account: alice, 900000
+//! account: bob, 900000
+
+// Alice sends 200 Libra Coins to Bob
+//! sender: alice
+//! args: {{bob}}
+//! gas-price: 0
+
+import 0x0.LibraAccount;
+import 0x0.LBR;
+import 0x0.Libra;
+
+main(receiver: address) {
+    let coins: Libra.T<LBR.T>;
+
+    coins = LibraAccount.withdraw_from_sender<LBR.T>(200);
+    LibraAccount.deposit<LBR.T>(move(receiver), move(coins));
+
+    return;
+}
+
+
+
+// Alice checks that her balance is less than 999800 Libra Coins. (200 + gas)
+//! new-transaction
+//! sender: alice
+
+import 0x0.LibraAccount;
+import 0x0.LBR;
+
+main() {
+    let balance: u64;
+    let sender: address;
+
+    sender = get_txn_sender();
+    balance = LibraAccount.balance<LBR.T>(move(sender));
+    assert(move(balance) <= 999800, 42);
+
+    return;
+}
+
+
+
+// Bob checks that he has 90200 Libra Coins
+//! new-transaction
+//! sender: bob
+import 0x0.LibraAccount;
+import 0x0.LBR;
+
+main() {
+    let balance: u64;
+    let sender: address;
+
+    sender = get_txn_sender();
+    balance = LibraAccount.balance<LBR.T>(move(sender));
+    assert(move(balance) == 900200, 42);
+
+    return;
+}

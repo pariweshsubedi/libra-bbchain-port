@@ -1,0 +1,95 @@
+error: undeclared `M::x`
+
+   ┌── tests/sources/schemas_err.move:4:17 ───
+   │
+ 4 │         ensures x > 0;
+   │                 ^
+   │
+
+error: schema `M::Undeclared` undeclared
+
+   ┌── tests/sources/schemas_err.move:8:9 ───
+   │
+ 8 │         include Undeclared;
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+
+error: wrong number of type arguments (expected 1, got 2)
+
+    ┌── tests/sources/schemas_err.move:12:9 ───
+    │
+ 12 │         include WrongTypeArgsIncluded<num, num>;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+
+error: `wrong` not declared in schema
+
+    ┌── tests/sources/schemas_err.move:19:44 ───
+    │
+ 19 │         include WrongTypeArgsIncluded<num>{wrong: 1};
+    │                                            ^^^^^
+    │
+
+error: expected `num` but found `bool`
+
+    ┌── tests/sources/schemas_err.move:24:47 ───
+    │
+ 24 │         include WrongTypeArgsIncluded<num>{x: y};
+    │                                               ^
+    │
+
+error: expected `bool` but found `num`
+
+    ┌── tests/sources/schemas_err.move:28:48 ───
+    │
+ 28 │         include WrongTypeArgsIncluded<bool>{x: 1 + 2};
+    │                                                ^^^^^
+    │
+
+error: incompatible type of included `x`; type in schema: `num`, type in inclusion context: `bool`
+
+    ┌── tests/sources/schemas_err.move:33:9 ───
+    │
+ 33 │         include WronglyTypedVarIncluded;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+
+error: incompatible type of included `x`; type in schema: `num`, type in inclusion context: `bool`
+
+    ┌── tests/sources/schemas_err.move:41:9 ───
+    │
+ 41 │         include WronglyTypedInstantiationIncluded<num>;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+
+error: cyclic schema dependency: Cycle1 -> Cycle2 -> Cycle3 -> Cycle1
+
+    ┌── tests/sources/schemas_err.move:80:9 ───
+    │
+ 80 │         include Cycle1;
+    │         ^^^^^^^^^^^^^^^
+    │
+
+error: `y` cannot be matched to an existing name in inclusion context
+
+    ┌── tests/sources/schemas_err.move:52:9 ───
+    │
+ 52 │         include UndeclaredVarInInclude;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+
+error: schema `M::Invariant` includes invariants which are not allowed in this context
+
+    ┌── tests/sources/schemas_err.move:61:9 ───
+    │
+ 61 │         include Invariant;
+    │         ^^^^^^^^^^^^^^^^^^
+    │
+
+error: schema `M::Condition` includes conditions which are not allowed in this context
+
+    ┌── tests/sources/schemas_err.move:70:9 ───
+    │
+ 70 │         include Condition;
+    │         ^^^^^^^^^^^^^^^^^^
+    │

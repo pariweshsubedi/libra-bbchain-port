@@ -1,0 +1,153 @@
+//! account: bbchain, 1000000
+//! account: mathcourse, 1000000
+//! account: mathprofessor, 1000000
+//! account: mathevaluator, 1000000
+//! account: student1, 1000000
+
+//! sender: bbchain
+module Course {
+    import 0x0.LibraAccount;
+    import 0x0.LibraCoin;
+    import 0x0.Vector;
+    // import 0x0.LibraSystem;
+    
+    // LibraSystem.get_current_block_height()
+    // LibraSystem.get_current_block_id()
+    // LibraSystem.get_current_timestamp()
+    // LibraSystem.get_current_proposer()
+
+    struct Student {
+      student_address: address
+    }
+
+    // define as resource so that other cant modify
+    resource Owners{
+        addresses: Vector.T<address>,
+        quorom: u64
+    }
+
+    resource T {
+        someBoolean: bool,
+        enrolledStudents: Vector.T<Self.Student>,
+
+        // events
+        student_added_events: LibraAccount.EventHandle<Self.StudentAddedEvent>
+    }
+
+    // Message Student Added Event
+    struct StudentAddedEvent {
+        // Address of the Student added
+        student: address,
+        // Address of the requester who wants to add student
+        requester: address,
+    }
+
+    // Adds Student as enrolled students
+    public add_student(student: address) acquires T {
+        Self.add_student_with_event(move(student), get_txn_sender());
+        return;
+    }
+
+    public add_student_with_event(
+        student_address: address,
+        requester_address: address
+    ) acquires T {
+        let requester_account_ref: &mut Self.T;
+        let new_student: Self.Student;
+        
+        // Verify that the student account exists
+        assert(LibraAccount.exists(copy(student_address)), 5);
+
+        // create new student using Student struct
+        new_student = Student { student_address: copy(student_address)};
+        
+        // get the requestor's resource to add students in it
+        requester_account_ref = borrow_global_mut<T>(copy(requester_address));
+
+        // set some value in the variable
+        // *(&mut move(requester_account_ref).someBoolean) = false;
+        
+        //add elements to vector
+        Vector.push_back<Self.Student>(&mut copy(requester_account_ref).enrolledStudents, move(new_student));
+
+        // release event after student addition
+        LibraAccount.emit_event<Self.StudentAddedEvent>(
+            &mut copy(requester_account_ref).student_added_events,
+            StudentAddedEvent {
+                student: move(student_address),
+                requester: move(requester_address)
+            },
+        );
+
+        return ;
+    }
+
+    // Returns number of enrolled student in a course
+    public get_enrolled_count(course_address: address) :u64 acquires T{
+        let course: &mut Self.T;
+        let total_enrolled: u64;
+        course = borrow_global_mut<T>(move(course_address));
+        total_enrolled = Vector.length<Self.Student>(&copy(course).enrolledStudents);
+        return move(total_enrolled);
+    }
+
+    // initialize a new course
+    public register(_owners: Vector.T<address>, _quorom: u64){
+        
+        // initialize owners
+        move_to_sender<Owners> Owners {
+            addresses: move(_owners), 
+            quorom: move(_quorom)
+        };
+        
+        // initialize course
+        move_to_sender<T> T {
+            someBoolean: false,
+            enrolledStudents: Vector.empty<Self.Student>(),
+            // events
+            student_added_events: LibraAccount.new_event_handle<Self.StudentAddedEvent>(),
+            
+        };
+        return;
+    }
+
+}
+
+
+// Test that a course can be registered
+//! new-transaction
+//! sender: mathcourse
+
+import {{bbchain}}.Course;
+import 0x0.Vector;
+
+main() {
+    let total_enrolled: u64;
+    // register course
+    // TODO : create course with multiple owners
+    Course.register(Vector.empty<address>(),1);
+    
+    // initial number of students enrolled should be 0
+    total_enrolled = Course.get_enrolled_count({{mathcourse}});
+    assert(move(total_enrolled) == 0, 42);
+    return;
+}
+
+// Test that a course can enroll students
+//! new-transaction
+//! sender: mathcourse
+//! args: {{student1}}
+
+import {{bbchain}}.Course;
+import 0x0.U64Util;
+
+main(student: address) {
+    let total_enrolled: u64;
+    Course.add_student(move(student));
+    total_enrolled = Course.get_enrolled_count({{mathcourse}});
+    assert(move(total_enrolled) == 1, 42);
+    return;
+}
+
+// check: StudentAddedEvent
+
