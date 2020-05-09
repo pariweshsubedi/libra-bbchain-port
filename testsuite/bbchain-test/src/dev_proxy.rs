@@ -95,8 +95,8 @@ pub struct ClientProxy {
 
 impl DevProxy {
     /// Construct a new TestClient.
-    pub fn create(bbchain_account: AccountData) -> Result<Self> {
-        let waypoint = Waypoint::from_str("0:5367e5164145983cb71f0fa34fb85f03f7a5b613be2a438db60b5f85d9a69245").expect("waypoint failure");
+    pub fn create(bbchain_account: AccountData, waypointStr: &str) -> Result<Self> {
+        let waypoint = Waypoint::from_str(waypointStr).expect("waypoint failure");
         let url = Url::parse("https://localhost:8000")?;
         let client = LibraClient::new(url, waypoint)?;
 

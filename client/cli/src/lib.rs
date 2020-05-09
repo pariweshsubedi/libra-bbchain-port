@@ -30,7 +30,7 @@ mod transfer_commands;
 
 /// Struct used to store data for each created account.  We track the sequence number
 /// so we can create new transactions easily
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Clone))]
 pub struct AccountData {
     /// Address of the account.

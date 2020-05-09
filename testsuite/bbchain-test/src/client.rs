@@ -43,6 +43,7 @@ impl InteractiveClient {
     pub fn new_with_inherit_io(
         port: u16,
         mnemonic_file_path: &Path,
+        waypointStr : &str
     ) -> Self {
         // We need to call canonicalize on the path because we are running client from
         // workspace root and the function calling new_with_inherit_io isn't necessarily
@@ -65,16 +66,10 @@ impl InteractiveClient {
                     .current_dir(workspace_builder::workspace_root())
                     .arg("-u")
                     .arg(format!("http://localhost:{}", port))
-                    .arg("-n")
-                    .arg(
-                        mnemonic_file_path
-                            .canonicalize()
-                            .expect("Unable to get canonical path of mnemonic file")
-                            .to_str()
-                            .unwrap(),
-                    )
-                    .arg("-m")
-                    .arg("/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/mint.key")
+                    .arg("--waypoint")
+                    .arg(waypointStr)
+                    .arg("-f")
+                    .arg("http://localhost:9000")
                     .stdin(Stdio::inherit())
                     .stdout(Stdio::inherit())
                     .stderr(Stdio::inherit())

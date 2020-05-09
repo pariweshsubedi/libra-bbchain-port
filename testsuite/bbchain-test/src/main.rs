@@ -37,6 +37,7 @@ struct BBChainModules{
 
 pub fn main() {
     setup_log();
+    let waypoint = "0:0ace663dbcaa390ee9405559f5e4dbb21f6f34b6bfa609de57518d8088428821";
 
     let args = Args::from_args();
     let mut rt = Runtime::new().unwrap();
@@ -46,43 +47,58 @@ pub fn main() {
     
 
     let mut txemitter = TxEmitter::new();
-    let instances = setup_instances();
-    let mut bbchain_account = rt.block_on(txemitter.get_bbchain_account(instances)).expect("Failed loading bbchain account");
-    println!("BBchain address : {}", bbchain_account.address);
+    // let instances = setup_instances();
+    // let mut bbchain_account = rt.block_on(txemitter.get_bbchain_account(instances)).expect("Failed loading bbchain account");
+    // println!("BBchain address : {}", bbchain_account.address);
 
-    //// rt.block_on(txemitter.open_publishing(setup_instances(), &mut bbchain_account));
+    // //// rt.block_on(txemitter.open_publishing(setup_instances(), &mut bbchain_account));
 
-    let mut dev = DevProxy::create(bbchain_account).expect("Failed to construct dev proxy.");
+    // let mut dev = DevProxy::create(bbchain_account, waypoint).expect("Failed to construct dev proxy.");
     
-    println!("Compile World");
-    let modules = vec![
-        // BBChainModules{
-        //     path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/bbchain/Proofs.mvir".to_string(),
-        //     deps : vec![
-        //         "/Users/pariweshsubedi/libra/language/stdlib".to_string()
-        //     ] 
-        // },
-        BBChainModules{
-            path : "/Users/pariweshsubedi/Desktop/UiS/4thsem/project/modules/move/my_module.move".to_string(),
-            deps : vec![
-                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
-            ] 
-        },
-        BBChainModules{
-            path : "/Users/pariweshsubedi/Desktop/UiS/4thsem/project/modules/move/sub_module.move".to_string(),
-            deps : vec![
-                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-                "/Users/pariweshsubedi/Desktop/UiS/4thsem/project/modules/move/my_module.move".to_string()
-            ] 
-        },        
-    ];
-    for f in &modules {
-        println!("Compiling : {}", f.path);
-        let compiled_path = dev.compile_modules(f.path.clone(), f.deps.clone()).expect("Failed to compile");
-        println!("Publishing Now...");
-        dev.publish_module(&compiled_path);
-        println!("!! Published !!");
-    }
+    // println!("Compile World");
+    // let modules = vec![
+    //     BBChainModules{
+    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+    //         deps : vec![
+    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
+    //         ] 
+    //     },
+    //     // BBChainModules{
+    //     //     path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
+    //     //     deps : vec![
+    //     //         "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+    //     //         "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
+    //     //     ] 
+    //     // },
+    //     // BBChainModules{
+    //     //     path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
+    //     //     deps : vec![
+    //     //         "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+    //     //         "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+    //     //         "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
+    //     //     ]
+    //     // },
+    //     // BBChainModules{
+    //     //     path : "/Users/pariweshsubedi/Desktop/UiS/4thsem/project/modules/move/my_module.move".to_string(),
+    //     //     deps : vec![
+    //     //         "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
+    //     //     ] 
+    //     // },
+    //     // BBChainModules{
+    //     //     path : "/Users/pariweshsubedi/Desktop/UiS/4thsem/project/modules/move/sub_module.move".to_string(),
+    //     //     deps : vec![
+    //     //         "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+    //     //         "/Users/pariweshsubedi/Desktop/UiS/4thsem/project/modules/move/my_module.move".to_string()
+    //     //     ] 
+    //     // },        
+    // ];
+    // for f in &modules {
+    //     println!("Compiling : {}", f.path);
+    //     let compiled_path = dev.compile_modules(f.path.clone(), f.deps.clone()).expect("Failed to compile");
+    //     println!("Publishing Now...");
+    //     dev.publish_module(&compiled_path).expect("Error publishing module");
+    //     println!("!! Published !!");
+    // }
     
     // println!("Hello World");
     // let mut runner = ClusterTestRunner::setup(&args);
@@ -90,7 +106,7 @@ pub fn main() {
     
     
     // // start interactive client
-    // start_interactive(8080);
+    start_interactive(8080, waypoint);
 }
 
 struct ClusterTestRunner {
@@ -146,7 +162,6 @@ fn setup_instances() -> Vec<Instance>{
     return instances;
 }
 
-
 fn setup_log() {
     if env::var("RUST_LOG").is_err() {
         env::set_var("RUST_LOG", "info");
@@ -154,15 +169,15 @@ fn setup_log() {
     ::libra_logger::Logger::new().is_async(true).init();
 }
 
-fn start_interactive(port: u16){
+fn start_interactive(port: u16, waypointStr: &str){
     let tmp_mnemonic_file = TempPath::new();
     tmp_mnemonic_file.create_as_file().unwrap();
     let client = client::InteractiveClient::new_with_inherit_io(
         port,
         &tmp_mnemonic_file.path(),
+        waypointStr
     );
     println!("Loading client...");
     let _output = client.output().expect("Failed to wait on child");
     println!("Exit client.");
 }
-
