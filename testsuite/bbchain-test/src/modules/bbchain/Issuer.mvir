@@ -1,0 +1,193 @@
+module Issuer {
+    import 0x0.LibraAccount;
+    import 0x0.Vector;
+    import 0xBBC.Proofs;
+    import 0xBBC.EarmarkedProofs;
+
+    // --------------------------------
+    // Resources
+    // --------------------------------
+    resource IssuerResource{
+        owners : vector<address>,
+        sub_issuers : vector<address>,
+        parent_issuer : address,
+        holders : vector<address>,
+        digests : vector<vector<u8>>,
+        revoked_digests : vector<vector<u8>>,
+        nonce: u64, // counter for each issue/revoke operation because it modifies ledger state
+        quorum : u64
+    }
+
+    //--------------------------------
+    // Methods
+    //--------------------------------
+
+    // Can only be invoked by credential account issuer. Ex: uni
+    public generateCredentialAccountDigest(holder:address){
+        EarmarkedProofs.generateCredentialAccountDigest(copy(holder));
+        return;
+    }
+
+    public signCredential(issuer: address, digest: vector<u8>){
+        let requester_account_ref: &mut Self.IssuerResource;
+
+        EarmarkedProofs.signCredential(copy(issuer), copy(digest));
+        return;
+    }
+
+    public verifyCredential(digest: vector<u8>, issuer: address, holder: address): bool acquires IssuerResource{
+        let requester_account_ref: &Self.IssuerResource;
+        let is_valid: bool;
+        requester_account_ref = borrow_global<IssuerResource>(copy(issuer));
+
+        // assert that the digest hasnt been revoked
+        assert(!Vector.contains<vector<u8>>(&copy(requester_account_ref).revoked_digests, &digest), 10);
+
+        // loop through digest issuer proof and verify that the digest belongs to the student
+        is_valid = EarmarkedProofs.verifyCredential(copy(digest), copy(issuer), copy(holder));
+        return move(is_valid);
+    }
+
+    public hasOwnership(addr: address, issuer: address): bool acquires IssuerResource{
+        let requester_account_ref: &Self.IssuerResource;
+        requester_account_ref = borrow_global<IssuerResource>(copy(issuer));
+
+        return Vector.contains<address>(&copy(requester_account_ref).owners, &addr);
+    }
+
+    public hasEnrollment(holder: address, issuer: address): bool acquires IssuerResource{
+        let requester_account_ref: &Self.IssuerResource;
+        requester_account_ref = borrow_global<IssuerResource>(copy(issuer));
+
+        return Vector.contains<address>(&copy(requester_account_ref).holders, &holder);
+    }
+
+
+    public registerIssuer(_owners: vector<address>, _parent_issuer: address, _quorum: u64) {
+        // validate if sender already holds an issuer resource
+        assert(!Self.hasIssuerResource(get_txn_sender()), 42);
+        move_to_sender<IssuerResource>(
+            Self.newIssuerResource(
+                copy(_owners), 
+                copy(_parent_issuer), 
+                copy(_quorum)
+            )
+        );
+        EarmarkedProofs.createIssuerLoggedProof(copy(_owners));
+        return;
+    }
+
+    // student use this to register register with Issuer
+    public initHolder(_issuer: address) acquires IssuerResource{
+        assert(!Self.hasIssuerResource(get_txn_sender()), 42); // shouldn't be a holder
+        assert(!Proofs.hasCredentialAccount(get_txn_sender()), 42); // shouldn't hold a credential account
+        // TODO : check that the issuer has issuer resource
+ 
+        Self.addHolder(get_txn_sender(), copy(_issuer));
+        Proofs.newCredentialAccount(move(_issuer), get_txn_sender());
+        
+        return;
+    }
+
+    // requested by sub issuer to register it under its parent issuer
+    public registerSubIssuer(_owners: vector<address>, parent_issuer: address,  _quorum: u64) acquires IssuerResource{
+        let requester_account_ref: &mut Self.IssuerResource;
+        assert(Self.hasIssuerResource(get_txn_sender()), 42); // only issuer can run this op.
+
+        // update issuer resource and add new holder
+        requester_account_ref = borrow_global_mut<IssuerResource>(copy(parent_issuer));
+        Vector.push_back<address>(&mut copy(requester_account_ref).sub_issuers, get_txn_sender());
+
+        Self.registerIssuer(copy(_owners), copy(parent_issuer),  copy(_quorum));
+        return;
+    }
+
+    public hasIssuerResource(addr: address): bool {
+        let issuerResourceExists: bool;
+        issuerResourceExists = exists<IssuerResource>(move(addr));
+        return move(issuerResourceExists);
+    }
+
+    //register holders credential proof in issuer logged proof
+    public registerHolder(holder:address) acquires IssuerResource{
+        let requester_account_mut_ref: &mut Self.IssuerResource;
+        let requester_account_ref: & Self.IssuerResource;
+        let credential_proof: Proofs.CredentialProof;
+
+        requester_account_mut_ref = borrow_global_mut<IssuerResource>(get_txn_sender());
+
+        // add holder to Issuer resource
+        Vector.push_back<address>(
+            &mut copy(requester_account_mut_ref).holders, 
+            copy(holder)
+        );
+
+        requester_account_ref = freeze(copy(requester_account_mut_ref));
+        credential_proof = Proofs.newCredentialProof(
+            get_txn_sender(), 
+            copy(holder), 
+            *&copy(requester_account_ref).quorum, 
+            *&copy(requester_account_ref).owners
+        );
+        
+        EarmarkedProofs.registerCP(move(credential_proof));
+
+        return;
+    }
+
+    // register holders credential under appropriate credential proof
+    public registerCredential(holder:address, digest: vector<u8>) acquires IssuerResource{
+        let requester_account_ref: &Self.IssuerResource;
+        let credential: Proofs.Credential;
+
+        requester_account_ref = borrow_global<IssuerResource>(get_txn_sender());
+
+        credential = Proofs.newCredential(
+            copy(holder),
+            copy(digest),
+            *&copy(requester_account_ref).owners,
+            *&copy(requester_account_ref).quorum
+        );
+        
+        EarmarkedProofs.registerCredential(move(credential));
+        return;
+    }
+
+    // // assert that the transaction sender is a valid owner
+    public canSign(issuer:address): bool acquires IssuerResource{
+        let requester_account_ref: &Self.IssuerResource;
+        let can_sign: bool;
+        let addr: address;
+
+        addr = get_txn_sender();
+
+        requester_account_ref = borrow_global<IssuerResource>(copy(issuer));
+        can_sign = Vector.contains<address>(&copy(requester_account_ref).owners, &addr);
+        
+        return copy(can_sign);
+    }
+
+    newIssuerResource(_owners: vector<address>, parent_issuer: address, _quorum: u64): Self.IssuerResource {
+        return IssuerResource { 
+            owners : move(_owners),
+            sub_issuers : Vector.empty<address>(),
+            parent_issuer : move(parent_issuer),
+            holders : Vector.empty<address>(),
+            digests : Vector.empty<vector<u8>>(),
+            revoked_digests : Vector.empty<vector<u8>>(),
+            nonce : 1,
+            quorum : copy(_quorum)
+        };
+    }
+
+    // adds holder to issuer resource
+    addHolder(_holder: address, _issuer: address) acquires IssuerResource{
+        let requester_account_ref: &mut Self.IssuerResource;
+        assert(Self.hasIssuerResource(copy(_issuer)), 42); // verify issuer
+
+        // update issuer resource and add new holder
+        requester_account_ref = borrow_global_mut<IssuerResource>(copy(_issuer));
+        Vector.push_back<address>(&mut copy(requester_account_ref).holders, copy(_holder));
+        return;
+    }
+}

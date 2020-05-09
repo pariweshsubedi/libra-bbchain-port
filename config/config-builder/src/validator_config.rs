@@ -208,16 +208,10 @@ impl ValidatorConfig {
 
         let validators = vm_genesis::validator_registrations(&nodes[..nodes_in_genesis]);
 
-        let test = Some({
-            let mut config = TestConfig::default();
-            config.publishing_option = Some(VMPublishingOption::Open);
-            config
-        });
-
         let genesis = vm_genesis::encode_genesis_transaction_with_validator(
             faucet_key.public_key(),
             &validators,
-            test
+            Some(VMPublishingOption::Open)
         );
 
         let waypoint = if self.build_waypoint {

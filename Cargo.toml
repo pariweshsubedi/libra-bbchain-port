@@ -111,6 +111,7 @@ members = [
     "storage/storage-service",
     "testsuite",
     "testsuite/cluster-test",
+    "testsuite/bbchain-test",
     "testsuite/libra-fuzzer",
     "testsuite/libra-fuzzer/fuzz",
     "testsuite/generate-format",

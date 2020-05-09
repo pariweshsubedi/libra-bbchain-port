@@ -1,0 +1,935 @@
+module Proofs {
+    import 0x0.Vector;
+    import 0x0.LibraAccount;
+
+    struct DummyEvent { 
+        b: bool 
+    }
+
+
+    struct Credential{
+        digest : vector<u8>,
+        holder : address,
+        signed : bool,
+        revoked : bool,
+        time: u64,
+        owners_signed : vector<address>,
+        owners : vector<address>,
+        quorum : u64
+    }
+
+    resource CredentialProof{
+        quorum: u64,
+        holder: address,
+        issuer: address,
+        owners : vector<address>,
+        valid : bool, // signed by quorum of owners
+        revoked : bool,
+        digest : vector<u8>,
+        credentials: vector<Self.Credential>
+    }
+
+    resource RevocationProof {
+        credentialProof: Self.CredentialProof,
+        reason: vector<u8>,
+        nonce: u64 // counter from issuer
+    }
+
+    // stored with holder
+    resource CredentialAccount{
+        issuer : address,
+        holder : address,
+        credential_proofs : vector<Self.CredentialProof>   
+    }
+
+    // // stored with issuer
+    resource RevocationProofs{
+        credential_proofs : vector<Self.RevocationProof>   
+    }
+
+    public emit_event(val: bool) {
+        let handle: LibraAccount.EventHandle<Self.DummyEvent>;
+        handle = LibraAccount.new_event_handle<Self.DummyEvent>();
+        LibraAccount.emit_event<Self.DummyEvent>(&mut handle, DummyEvent{ b: copy(val) });
+        LibraAccount.destroy_handle<Self.DummyEvent>(move(handle));
+        return;
+    }
+
+    public getCredentialAccountProofLength(): u64 acquires CredentialAccount {
+        let credential_account_ref: &Self.CredentialAccount;
+        let len: u64;
+        
+        credential_account_ref = borrow_global<CredentialAccount>(get_txn_sender());
+        len = Vector.length<Self.CredentialProof>(&copy(credential_account_ref).credential_proofs);
+        return move(len);
+    }
+
+    setCredentialProofDigest(credential_proof : &mut Self.CredentialProof, digest: vector<u8>){
+        *&mut copy(credential_proof).digest = copy(digest);
+        return;
+    }
+
+    public moveCredentialsProofToAccount(credential_proof: Self.CredentialProof, aggregation: vector<u8>) acquires CredentialAccount{
+        let credential_account_ref: &mut Self.CredentialAccount;
+        
+        // *&mut copy(credential_proof).digest = h"";
+        Self.setCredentialProofDigest(&mut credential_proof, copy(aggregation));
+
+        // TODO : check if credential is valid
+        credential_account_ref = borrow_global_mut<CredentialAccount>(get_txn_sender());
+        Vector.push_back<Self.CredentialProof>(
+            &mut copy(credential_account_ref).credential_proofs, 
+            move(credential_proof)
+        );
+        return;
+    }
+
+    public getCredentialByDigest(credentials: &vector<Self.Credential>, digest: &vector<u8>): u64 * bool{
+        let len: u64;
+        let i: u64;
+        let credential_ref: &Self.Credential;
+
+        i = 0;
+        len = Vector.length<Self.Credential>(copy(credentials));
+
+        while (copy(i) < copy(len)) {
+            credential_ref = Vector.borrow<Self.Credential>(copy(credentials), copy(i));
+            
+            if (*copy(digest) == *&copy(credential_ref).digest) {
+                return copy(i), true;
+            }
+            i = move(i) + 1;
+        }
+
+        return 0, false;
+    }
+
+    public getCredentialProofIndexByHolderAddress(credential_proofs: &vector<Self.CredentialProof>,holder :&address): u64 * bool{
+        let len: u64;
+        let i: u64;
+        let credential_proof_ref: &Self.CredentialProof;
+
+        i = 0;
+        len = Vector.length<Self.CredentialProof>(copy(credential_proofs));
+
+        while (copy(i) < copy(len)) {
+            credential_proof_ref = Vector.borrow<Self.CredentialProof>(copy(credential_proofs), copy(i));
+            
+            if (*copy(holder) == *&copy(credential_proof_ref).holder) {
+                return copy(i), true;
+            }
+            i = move(i) + 1;
+        }
+
+        return 0, false;
+    }
+
+    public getCredentialProofIndexByDigest(credential_proofs: &vector<Self.CredentialProof>, digest: &vector<u8>, check_valid: bool): u64 * bool {
+        let len: u64;
+        let i: u64;
+        let credential_proof_ref: &Self.CredentialProof;
+
+        i = 0;
+        len = Vector.length<Self.CredentialProof>(copy(credential_proofs));
+
+        while (copy(i) < copy(len)) {
+            credential_proof_ref = Vector.borrow<Self.CredentialProof>(copy(credential_proofs), copy(i));
+            
+            if (*copy(digest) == *&copy(credential_proof_ref).digest) {
+                if(copy(check_valid)){
+                    if(*&copy(credential_proof_ref).valid){
+                        return copy(i), true;
+                    }
+                }else{
+                    return copy(i), true;
+                }
+            }
+            i = move(i) + 1;
+        }
+
+        return 0, false;
+    }
+
+    public getCredentialHolder(_credential: &Self.Credential): address{
+        return *&copy(_credential).holder;
+    }
+
+    public getCredentialProofHolder(_credential_proof: &Self.CredentialProof): address{
+        return *&copy(_credential_proof).holder;
+    }
+
+    public insertCredential(credential_proofs_mut: &mut vector<Self.CredentialProof>, _credential: Self.Credential): bool{
+        let len: u64;
+        let i: u64;
+        let credential_proof_ref: &mut Self.CredentialProof;
+        let _holder: address;
+
+        _holder = Self.getCredentialHolder(& _credential);
+
+        i = 0;
+        len = Vector.length<Self.CredentialProof>(freeze(copy(credential_proofs_mut)));
+        while (copy(i) < copy(len)) {
+            credential_proof_ref = Vector.borrow_mut<Self.CredentialProof>(copy(credential_proofs_mut), copy(i));
+            if (copy(_holder) == *&copy(credential_proof_ref).holder) {
+                Vector.push_back<Self.Credential>(
+                    &mut move(credential_proof_ref).credentials, 
+                    move(_credential)
+                );
+                return true;
+            }
+            i = move(i) + 1;
+        }
+
+        return false;
+    }
+
+    public getCredentialIndexByDigest(credentials: &vector<Self.Credential>, digest: &vector<u8>): u64 * bool {
+        let len: u64;
+        let i: u64;
+        let credential_ref: &Self.Credential;
+
+        i = 0;
+        len = Vector.length<Self.Credential>(copy(credentials));
+
+        while (copy(i) < copy(len)) {
+            credential_ref = Vector.borrow<Self.Credential>(copy(credentials), copy(i));
+            
+            if (*copy(digest) == *&copy(credential_ref).digest) {
+                return copy(i), true;
+            }
+            i = move(i) + 1;
+        }
+
+        return 0, false;
+    }
+
+    public signAsOwner(credential: &mut Self.Credential){
+        let sender_address: address;
+        let owners: &vector<address>;
+        let owners_signed: &mut vector<address>;
+        
+        sender_address = get_txn_sender();
+        owners = &copy(credential).owners;
+        owners_signed = &mut copy(credential).owners_signed;
+        
+        assert(Vector.contains<address>(copy(owners), &sender_address), 1);
+        assert(!Vector.contains<address>(freeze(copy(owners_signed)), &sender_address), 1);
+
+        Vector.push_back<address>(
+                    copy(owners_signed), 
+                    copy(sender_address)
+                );
+        
+        return;
+    }
+
+    public hasSignatureConsensus(credential: &mut Self.Credential): bool{
+        let owners_signed_len: u64;
+        let owners_signed: &mut vector<address>;
+        owners_signed = &mut copy(credential).owners_signed;
+        owners_signed_len = Vector.length<address>(freeze(copy(owners_signed)));
+        
+        if(copy(owners_signed_len) == *&copy(credential).quorum){
+            *&mut copy(credential).signed = true;
+            return true;
+        }
+        return false;
+    }
+
+    public hasCredentialAccount(addr: address): bool {
+        let has: bool;
+        has = exists<CredentialAccount>(move(addr));
+        Self.emit_event(copy(has));
+        return move(has);
+    }
+
+    public newCredential(holder: address, digest: vector<u8>, _owners: vector<address>, _quorum: u64): Self.Credential{
+        return Credential{
+            digest : copy(digest),
+            holder : copy(holder),
+            signed : false,
+            revoked : false,
+            time: 1, // replace this with time.now() from newer libra version
+            owners_signed : Vector.empty<address>(),
+            owners : move(_owners),
+            quorum: copy(_quorum)
+        };
+    }
+
+    public newCredentialAccount(_issuer: address, _holder: address){
+        move_to_sender<CredentialAccount>(
+            CredentialAccount {
+                issuer : move(_issuer),
+                holder : move(_holder),
+                credential_proofs : Vector.empty<Self.CredentialProof>()
+            }
+        );
+        return;
+    }
+
+    public newCredentialProof(_issuer: address, _holder: address, _quorum: u64, _owners: vector<address>): Self.CredentialProof {
+        return CredentialProof{
+            quorum : move(_quorum),
+            holder : move(_holder),
+            issuer : move(_issuer),
+            owners : move(_owners),
+            valid : false, 
+            revoked : false,
+            digest : h"",
+            credentials : Vector.empty<Self.Credential>(),
+        };      
+    }
+
+    public getCredentialProofDigests(credential_proof : &Self.CredentialProof): vector<vector<u8>>{
+        let digests: vector<vector<u8>>; 
+        let len: u64;
+        let i: u64;
+        let credentials: &vector<Self.Credential>;
+        let credential_ref: &Self.Credential;
+        let credential_proof_holder : address;
+
+        credential_proof_holder = Self.getCredentialProofHolder(copy(credential_proof));
+        credentials = &copy(credential_proof).credentials;
+        digests = Vector.empty<vector<u8>>();
+
+        i = 0;
+        len = Vector.length<Self.Credential>(copy(credentials));
+
+        while (copy(i) < copy(len)) {
+            credential_ref = Vector.borrow<Self.Credential>(copy(credentials), copy(i));
+            assert(copy(credential_proof_holder) == *&copy(credential_ref).holder, 890);
+            Vector.push_back<vector<u8>>(
+                &mut digests, 
+                *&copy(credential_ref).digest
+            );
+           
+            i = move(i) + 1;
+        }
+
+        return move(digests);
+    }
+
+    public aggregateDigests(digests: vector<vector<u8>>): vector<u8>{
+        let aggregated_digest: vector<u8>;
+        let digests_mut: &mut vector<vector<u8>>;
+        let digest: vector<u8>;
+        let len: u64;
+        let i: u64;
+
+        aggregated_digest = h"";
+        digests_mut = &mut digests;
+        i = 0;
+        len = Vector.length<vector<u8>>(freeze(copy(digests_mut)));
+
+        loop {
+            digest = *Vector.borrow_mut<vector<u8>>(copy(digests_mut), copy(i));
+            Vector.append<u8>(&mut aggregated_digest, copy(digest));
+
+            i = copy(i) + 1;
+            if (copy(i) >= copy(len)) {
+                break;
+            }
+        }
+        
+        return move(aggregated_digest);
+    }
+
+    // aggregates digests in a credential account
+    public compileCredentialProof(holder:address): vector<vector<u8>>*vector<u8> acquires CredentialAccount{
+        let credential_account_ref: &mut Self.CredentialAccount;
+        let digests: vector<vector<u8>>;
+        let aggregated_digest : vector<u8>;
+        
+        credential_account_ref = borrow_global_mut<CredentialAccount>(copy(holder));
+        assert(*&copy(credential_account_ref).issuer == get_txn_sender(), 90);
+        
+        digests, aggregated_digest = Self.aggregateCredentialProofs(&copy(credential_account_ref).credential_proofs);
+        // *&mut copy(credential_account_ref).digest = copy(aggregated_digest);
+        return copy(digests), copy(aggregated_digest);
+    }
+
+    // aggregate credential proof digests
+    public aggregateCredentialProofs(credential_proofs: &vector<Self.CredentialProof>): vector<vector<u8>>*vector<u8>{
+        let digests: vector<vector<u8>>;
+        let credential_proof_ref: &Self.CredentialProof;
+        let len: u64;
+        let i: u64;
+        
+        i = 0;
+        len = Vector.length<Self.CredentialProof>(copy(credential_proofs));
+        digests = Vector.empty<vector<u8>>();
+
+        while (copy(i) < copy(len)) {
+            credential_proof_ref = Vector.borrow<Self.CredentialProof>(copy(credential_proofs), copy(i));
+            
+            Vector.push_back<vector<u8>>(
+                &mut digests, 
+                *&copy(credential_proof_ref).digest
+            );
+            
+            i = move(i) + 1;
+        }
+        return copy(digests), Self.aggregateDigests(copy(digests));
+    }
+
+}
+
+// module that allows issuer to mark a credential resource for recepients
+module EarmarkedProofs {
+    import 0x0000000000000000000000000a550c18.Proofs;
+    import 0x0.Vector;
+    import 0x0.LibraAccount;
+    // import 0x0.Hash;
+
+    struct MyEvent { 
+        b: bool 
+    }
+
+    struct DigestHolder {
+        digests : vector<vector<u8>>,
+        holder : address,
+        aggregation : vector<u8>
+    }
+
+    //--------------------------------
+    // Resources
+    //--------------------------------
+
+    // A wrapper containing a Libra coin and the address of the recipient the
+    // coin is earmarked for.
+    resource LoggedProofs {
+        owners : vector<address>,
+        credential_proofs: vector<Proofs.CredentialProof>,
+        credentials: vector<Proofs.Credential>
+    }
+
+    resource DigestHolderProofs {
+        digest_holders: vector<Self.DigestHolder>
+    }
+
+    resource RevocationProofs {
+        revoked_digests: vector<vector<u8>>
+    }
+
+//     //--------------------------------
+//     // Methods
+//     //--------------------------------
+
+    public is_digest_revoked(digest:  vector<u8>, issuer: address): bool acquires RevocationProofs{
+        let requester_revocation_proofs: &Self.RevocationProofs;
+        requester_revocation_proofs = borrow_global<RevocationProofs>(copy(issuer));
+
+        // check if the digest is revoked
+        return Vector.contains< vector<u8>>(&copy(requester_revocation_proofs).revoked_digests, &digest);
+    }
+
+    // Works only if called by issuer
+    public revoke_digest(digest:  vector<u8>) acquires RevocationProofs{
+        let requester_revocation_proofs: &mut Self.RevocationProofs;
+        requester_revocation_proofs = borrow_global_mut<RevocationProofs>(get_txn_sender());
+
+        // assert that the digest is not already revoked
+        assert(!Vector.contains< vector<u8>>(&copy(requester_revocation_proofs).revoked_digests, &digest), 400);
+        Vector.push_back< vector<u8>>(
+                &mut copy(requester_revocation_proofs).revoked_digests,
+                move(digest)
+            );
+        return;
+    }
+
+    public getCredentialProofLength(addr: address): u64 acquires LoggedProofs {
+        let requester_logged_proofs: &Self.LoggedProofs;
+        let len: u64;
+        
+        requester_logged_proofs = borrow_global<LoggedProofs>(copy(addr));
+        len = Vector.length<Proofs.CredentialProof>(&copy(requester_logged_proofs).credential_proofs);
+        return move(len);
+    }
+
+    public getCredentialLength(issuer: address): u64 acquires LoggedProofs {
+        let requester_logged_proofs: &Self.LoggedProofs;
+        let len: u64;
+        
+        requester_logged_proofs = borrow_global<LoggedProofs>(copy(issuer));
+        len = Vector.length<Proofs.Credential>(&copy(requester_logged_proofs).credentials);
+        return move(len);
+    }
+
+    public hasOwnership(addr: address, issuer: address): bool acquires LoggedProofs {
+        let requester_logged_proofs: &Self.LoggedProofs;
+        
+        requester_logged_proofs = borrow_global<LoggedProofs>(copy(issuer));
+        return Vector.contains<address>(&copy(requester_logged_proofs).owners, &addr);
+    }
+
+    public hasLoggedProofs(addr: address): bool {
+        let exists: bool;
+        exists = exists<LoggedProofs>(move(addr));
+        return move(exists);
+    }
+
+    public hasRevocationProofs(addr: address): bool {
+        let exists: bool;
+        exists = exists<RevocationProofs>(move(addr));
+        return move(exists);
+    }
+
+    public createIssuerLoggedProof(_owners: vector<address>){
+        move_to_sender<LoggedProofs>(
+            LoggedProofs {
+                owners: move(_owners),
+                credential_proofs : Vector.empty<Proofs.CredentialProof>(),
+                credentials : Vector.empty<Proofs.Credential>()
+            }
+        );
+
+        move_to_sender<DigestHolderProofs>(
+            DigestHolderProofs {
+                digest_holders: Vector.empty<Self.DigestHolder>()
+            }
+        );
+
+        move_to_sender<RevocationProofs>(
+            RevocationProofs {
+                revoked_digests: Vector.empty<vector<u8>>()
+            }
+        );
+
+        return;
+    }
+
+    // sign credential
+    // invoked by : owner
+    // TODO:
+    // 2 check if quorums on credential has been reached
+    // 3 move credential to appropriate credential proof
+    // 4 compute digest of credential proof based on all included credential
+    public signCredential(issuer: address, digest: vector<u8>) acquires LoggedProofs{
+        let requester_logged_proofs: &mut Self.LoggedProofs;
+        let success: bool;
+        let sender_address: address;
+        let credential_index:u64;
+        let credential_exists:bool;
+        let credential_mut_ref: &mut Proofs.Credential;
+        let has_consensus: bool;
+        
+        let owners: &vector<address>;
+        let credentials: &mut vector<Proofs.Credential>;
+        let credential_proofs: &mut vector<Proofs.CredentialProof>;
+        let signed_credential: Proofs.Credential;
+        let signed_credential_mut: &mut Proofs.Credential;
+        let successfulTransfer: bool;
+        
+        sender_address = get_txn_sender();
+
+        // 1 sign the credential associated with vector<u8>
+        // ownership verification
+        requester_logged_proofs = borrow_global_mut<LoggedProofs>(copy(issuer));
+        owners = &copy(requester_logged_proofs).owners;
+        credentials = &mut copy(requester_logged_proofs).credentials;
+        credential_proofs = &mut copy(requester_logged_proofs).credential_proofs;
+        assert(Vector.contains<address>(copy(owners), &sender_address), 198);
+
+        // Fetch credential
+        credential_index, credential_exists=Proofs.getCredentialIndexByDigest(freeze(copy(credentials)), &digest);
+        assert(copy(credential_exists), 199);
+        
+        signed_credential = Vector.swap_remove<Proofs.Credential>(copy(credentials), copy(credential_index));
+        signed_credential_mut = &mut signed_credential;
+        Proofs.signAsOwner(copy(signed_credential_mut));
+
+        // handle signed transactions
+        has_consensus = Proofs.hasSignatureConsensus(copy(signed_credential_mut));
+        if(copy(has_consensus)){
+            // push credential to credential proof
+            successfulTransfer = Proofs.insertCredential(
+                copy(credential_proofs), 
+                *move(signed_credential_mut)
+            );
+            assert(copy(successfulTransfer), 49);
+        }else{
+            // push credential to logged credentials 
+            Vector.push_back<Proofs.Credential>(
+                copy(credentials), 
+                *move(signed_credential_mut)
+            );
+        }
+
+        return;
+    }
+
+    // TODO: register credential inserts into earmarked proof credentials vector
+    public registerCredential(credential: Proofs.Credential) acquires LoggedProofs{
+        let requester_logged_proofs: &mut Self.LoggedProofs;
+        let success: bool;
+
+        requester_logged_proofs = borrow_global_mut<LoggedProofs>(get_txn_sender());
+         Vector.push_back<Proofs.Credential>(
+            &mut copy(requester_logged_proofs).credentials, 
+            move(credential)
+        );
+        return;
+    }
+
+    // called by issuer when registering CP
+    // fails if it is not an issuer running this
+    public registerCP(cp: Proofs.CredentialProof) acquires LoggedProofs{
+        let requester_logged_proofs: &mut Self.LoggedProofs;
+        requester_logged_proofs = borrow_global_mut<LoggedProofs>(get_txn_sender());
+        Vector.push_back<Proofs.CredentialProof>(
+            &mut copy(requester_logged_proofs).credential_proofs, 
+            move(cp)
+        );
+        return;
+    }
+
+    // called by receipient to claimCP. Can only be claimed if a quorum of owners have signed
+    // params : 
+    // issuer : address of the issuing course
+    public claimCP(issuer: address) acquires LoggedProofs, DigestHolderProofs{
+        let cp_index: u64;
+        let cp_exists: bool;
+        let credential_proof: Proofs.CredentialProof;
+        let credential_proof_ref: &Proofs.CredentialProof;
+        let requester_logged_proofs: &mut Self.LoggedProofs;
+        let sender_address: address;
+        let aggregation: vector<u8>;
+        sender_address = get_txn_sender();
+
+        //TODO: validate that issuer knows the sender (in issuerresource.holders)
+        requester_logged_proofs = borrow_global_mut<LoggedProofs>(copy(issuer));
+        cp_index, cp_exists = Proofs.getCredentialProofIndexByHolderAddress(& copy(requester_logged_proofs).credential_proofs, &sender_address);
+        
+        // check that a credential proof exists
+        assert(copy(cp_exists), 42);
+        
+        // remove credential proof from issuer resource
+        credential_proof = Vector.swap_remove<Proofs.CredentialProof>(&mut copy(requester_logged_proofs).credential_proofs, copy(cp_index));
+
+        // save digest as digest holder proof
+        aggregation = Self.createDigestHolderProof(&mut credential_proof, copy(issuer));
+
+        // move credential proof to holder account
+        Proofs.moveCredentialsProofToAccount(move(credential_proof),move(aggregation));
+
+        return;
+    }
+
+    createDigestHolderProof(credential_proof : &mut Proofs.CredentialProof, issuer: address): vector<u8> acquires DigestHolderProofs{
+        let digests: vector<vector<u8>>;
+        let digest_holder: Self.DigestHolder;
+        let requester_dh_proofs: &mut Self.DigestHolderProofs;
+        let holder: address;
+        let aggregation: vector<u8>;
+
+        requester_dh_proofs = borrow_global_mut<DigestHolderProofs>(copy(issuer));
+
+        holder = Proofs.getCredentialProofHolder(freeze(copy(credential_proof)));
+        digests = Proofs.getCredentialProofDigests(freeze(copy(credential_proof)));
+        aggregation = Proofs.aggregateDigests(copy(digests));
+        
+        digest_holder = DigestHolder {
+            digests : copy(digests),
+            holder : move(holder),
+            aggregation : copy(aggregation)
+        };
+
+        Vector.push_back<Self.DigestHolder>(
+            &mut copy(requester_dh_proofs).digest_holders, 
+            copy(digest_holder)
+        );
+
+        return copy(aggregation);
+    }
+
+
+    public aggregateProofs(digests: vector<vector<u8>>): vector<u8>{
+        let aggregated_digest: vector<u8>;
+        // let aggregated_digest_mut: &mut vector<u8>;
+        let digests_mut: &mut vector<vector<u8>>;
+        let digest: vector<u8>;
+        let len: u64;
+        let i: u64;
+
+        aggregated_digest = h"";
+
+        digests_mut = &mut digests;
+        i = 0;
+        len = Vector.length<vector<u8>>(freeze(copy(digests_mut)));
+
+        loop {
+            digest = *Vector.borrow_mut<vector<u8>>(copy(digests_mut), copy(i));
+            Vector.append<u8>(&mut aggregated_digest, copy(digest));
+
+            i = copy(i) + 1;
+            if (copy(i) >= copy(len)) {
+                break;
+            }
+        }
+        
+        return move(aggregated_digest);
+    }
+    
+    //digest - aggregated digest to verify
+    public verifyCredential(digest: vector<u8>, issuer: address, student: address): bool acquires DigestHolderProofs, RevocationProofs{
+        let digest_student_pair_exists: bool;
+        let requester_dh_proofs: &Self.DigestHolderProofs;
+        let len: u64;
+        let i: u64;
+        let digest_holder_ref: &Self.DigestHolder;
+
+        // check if the digest is revoked
+        assert(!Self.is_digest_revoked(copy(digest), copy(issuer)), 400);
+        
+        // loop through digest holder proof
+        // if the digest belongs to student
+        i = 0;
+        requester_dh_proofs = borrow_global<DigestHolderProofs>(copy(issuer));
+        len = Vector.length<Self.DigestHolder>(&copy(requester_dh_proofs).digest_holders);
+
+        while (copy(i) < copy(len)) {
+            digest_holder_ref = Vector.borrow<Self.DigestHolder>(&copy(requester_dh_proofs).digest_holders, copy(i));
+            
+            // means that the issuer issued credential proof for the student
+            if (copy(student) == *&copy(digest_holder_ref).holder) {
+                // check for matching aggregation
+                if(copy(digest) == *&copy(digest_holder_ref).aggregation){
+                    return true;
+                }
+            }
+            i = move(i) + 1;
+        }        
+        return false;
+    }
+
+    public generateCredentialAccountDigest(holder:address) acquires DigestHolderProofs{
+        let digests: vector<vector<u8>>;
+        let aggregated_digest : vector<u8>;
+        let requester_dh_proofs: &mut Self.DigestHolderProofs;
+        let digest_holder: Self.DigestHolder;
+        
+        requester_dh_proofs = borrow_global_mut<DigestHolderProofs>(get_txn_sender());
+        digests, aggregated_digest = Proofs.compileCredentialProof(copy(holder));
+        
+        digest_holder = DigestHolder {
+            digests : copy(digests),
+            holder : copy(holder),
+            aggregation : copy(aggregated_digest)
+        };
+
+        Vector.push_back<Self.DigestHolder>(
+            &mut copy(requester_dh_proofs).digest_holders, 
+            copy(digest_holder)
+        );
+        return;
+    }
+
+
+    // Events
+    public emit_event(val: bool) {
+        let handle: LibraAccount.EventHandle<Self.MyEvent>;
+        handle = LibraAccount.new_event_handle<Self.MyEvent>();
+        LibraAccount.emit_event<Self.MyEvent>(&mut handle, MyEvent{ b: copy(val) });
+        LibraAccount.destroy_handle<Self.MyEvent>(move(handle));
+        return;
+    }
+
+    // TODO: Aggregate credential proof as a root issuer
+    public aggregateCredentialProofs(holder:address){
+        return;
+    }
+}
+
+module Issuer {
+    import 0x0.LibraAccount;
+    import 0x0.Vector;
+    import 0x0000000000000000000000000a550c18.Proofs;
+    import 0x0000000000000000000000000a550c18.EarmarkedProofs;
+
+    // --------------------------------
+    // Resources
+    // --------------------------------
+    resource IssuerResource{
+        owners : vector<address>,
+        sub_issuers : vector<address>,
+        parent_issuer : address,
+        holders : vector<address>,
+        digests : vector<vector<u8>>,
+        revoked_digests : vector<vector<u8>>,
+        nonce: u64, // counter for each issue/revoke operation because it modifies ledger state
+        quorum : u64
+    }
+
+    //--------------------------------
+    // Methods
+    //--------------------------------
+
+    // Can only be invoked by credential account issuer. Ex: uni
+    public generateCredentialAccountDigest(holder:address){
+        EarmarkedProofs.generateCredentialAccountDigest(copy(holder));
+        return;
+    }
+
+    public signCredential(issuer: address, digest: vector<u8>){
+        let requester_account_ref: &mut Self.IssuerResource;
+
+        EarmarkedProofs.signCredential(copy(issuer), copy(digest));
+        return;
+    }
+
+    public verifyCredential(digest: vector<u8>, issuer: address, holder: address): bool acquires IssuerResource{
+        let requester_account_ref: &Self.IssuerResource;
+        let is_valid: bool;
+        requester_account_ref = borrow_global<IssuerResource>(copy(issuer));
+
+        // assert that the digest hasnt been revoked
+        assert(!Vector.contains<vector<u8>>(&copy(requester_account_ref).revoked_digests, &digest), 10);
+
+        // loop through digest issuer proof and verify that the digest belongs to the student
+        is_valid = EarmarkedProofs.verifyCredential(copy(digest), copy(issuer), copy(holder));
+        return move(is_valid);
+    }
+
+    public hasOwnership(addr: address, issuer: address): bool acquires IssuerResource{
+        let requester_account_ref: &Self.IssuerResource;
+        requester_account_ref = borrow_global<IssuerResource>(copy(issuer));
+
+        return Vector.contains<address>(&copy(requester_account_ref).owners, &addr);
+    }
+
+    public hasEnrollment(holder: address, issuer: address): bool acquires IssuerResource{
+        let requester_account_ref: &Self.IssuerResource;
+        requester_account_ref = borrow_global<IssuerResource>(copy(issuer));
+
+        return Vector.contains<address>(&copy(requester_account_ref).holders, &holder);
+    }
+
+
+    public registerIssuer(_owners: vector<address>, _parent_issuer: address, _quorum: u64) {
+        // validate if sender already holds an issuer resource
+        assert(!Self.hasIssuerResource(get_txn_sender()), 42);
+        move_to_sender<IssuerResource>(
+            Self.newIssuerResource(
+                copy(_owners), 
+                copy(_parent_issuer), 
+                copy(_quorum)
+            )
+        );
+        EarmarkedProofs.createIssuerLoggedProof(copy(_owners));
+        return;
+    }
+
+    // student use this to register register with Issuer
+    public initHolder(_issuer: address) acquires IssuerResource{
+        assert(!Self.hasIssuerResource(get_txn_sender()), 42); // shouldn't be a holder
+        assert(!Proofs.hasCredentialAccount(get_txn_sender()), 42); // shouldn't hold a credential account
+        // TODO : check that the issuer has issuer resource
+ 
+        Self.addHolder(get_txn_sender(), copy(_issuer));
+        Proofs.newCredentialAccount(move(_issuer), get_txn_sender());
+        
+        return;
+    }
+
+    // requested by sub issuer to register it under its parent issuer
+    public registerSubIssuer(_owners: vector<address>, parent_issuer: address,  _quorum: u64) acquires IssuerResource{
+        let requester_account_ref: &mut Self.IssuerResource;
+        assert(Self.hasIssuerResource(get_txn_sender()), 42); // only issuer can run this op.
+
+        // update issuer resource and add new holder
+        requester_account_ref = borrow_global_mut<IssuerResource>(copy(parent_issuer));
+        Vector.push_back<address>(&mut copy(requester_account_ref).sub_issuers, get_txn_sender());
+
+        Self.registerIssuer(copy(_owners), copy(parent_issuer),  copy(_quorum));
+        return;
+    }
+
+    public hasIssuerResource(addr: address): bool {
+        let issuerResourceExists: bool;
+        issuerResourceExists = exists<IssuerResource>(move(addr));
+        return move(issuerResourceExists);
+    }
+
+    //register holders credential proof in issuer logged proof
+    public registerHolder(holder:address) acquires IssuerResource{
+        let requester_account_mut_ref: &mut Self.IssuerResource;
+        let requester_account_ref: & Self.IssuerResource;
+        let credential_proof: Proofs.CredentialProof;
+
+        requester_account_mut_ref = borrow_global_mut<IssuerResource>(get_txn_sender());
+
+        // add holder to Issuer resource
+        Vector.push_back<address>(
+            &mut copy(requester_account_mut_ref).holders, 
+            copy(holder)
+        );
+
+        requester_account_ref = freeze(copy(requester_account_mut_ref));
+        credential_proof = Proofs.newCredentialProof(
+            get_txn_sender(), 
+            copy(holder), 
+            *&copy(requester_account_ref).quorum, 
+            *&copy(requester_account_ref).owners
+        );
+        
+        EarmarkedProofs.registerCP(move(credential_proof));
+
+        return;
+    }
+
+    // register holders credential under appropriate credential proof
+    public registerCredential(holder:address, digest: vector<u8>) acquires IssuerResource{
+        let requester_account_ref: &Self.IssuerResource;
+        let credential: Proofs.Credential;
+
+        requester_account_ref = borrow_global<IssuerResource>(get_txn_sender());
+
+        credential = Proofs.newCredential(
+            copy(holder),
+            copy(digest),
+            *&copy(requester_account_ref).owners,
+            *&copy(requester_account_ref).quorum
+        );
+        
+        EarmarkedProofs.registerCredential(move(credential));
+        return;
+    }
+
+    // // assert that the transaction sender is a valid owner
+    public canSign(issuer:address): bool acquires IssuerResource{
+        let requester_account_ref: &Self.IssuerResource;
+        let can_sign: bool;
+        let addr: address;
+
+        addr = get_txn_sender();
+
+        requester_account_ref = borrow_global<IssuerResource>(copy(issuer));
+        can_sign = Vector.contains<address>(&copy(requester_account_ref).owners, &addr);
+        
+        return copy(can_sign);
+    }
+
+    newIssuerResource(_owners: vector<address>, parent_issuer: address, _quorum: u64): Self.IssuerResource {
+        return IssuerResource { 
+            owners : move(_owners),
+            sub_issuers : Vector.empty<address>(),
+            parent_issuer : move(parent_issuer),
+            holders : Vector.empty<address>(),
+            digests : Vector.empty<vector<u8>>(),
+            revoked_digests : Vector.empty<vector<u8>>(),
+            nonce : 1,
+            quorum : copy(_quorum)
+        };
+    }
+
+    // adds holder to issuer resource
+    addHolder(_holder: address, _issuer: address) acquires IssuerResource{
+        let requester_account_ref: &mut Self.IssuerResource;
+        assert(Self.hasIssuerResource(copy(_issuer)), 42); // verify issuer
+
+        // update issuer resource and add new holder
+        requester_account_ref = borrow_global_mut<IssuerResource>(copy(_issuer));
+        Vector.push_back<address>(&mut copy(requester_account_ref).holders, copy(_holder));
+        return;
+    }
+}

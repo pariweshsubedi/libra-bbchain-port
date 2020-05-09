@@ -1,0 +1,7 @@
+import 0x0000000000000000000000000a550c18.Proofs;
+
+main(){
+    let hasCredentialAccount: bool;
+    hasCredentialAccount = Proofs.hasCredentialAccount(get_txn_sender());
+    return;
+}
