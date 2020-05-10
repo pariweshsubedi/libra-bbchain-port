@@ -52,49 +52,49 @@ pub fn main() {
     
 
     let mut txemitter = TxEmitter::new();
-    let instances = setup_instances();
-    let mut bbchain_account = rt.block_on(txemitter.get_bbchain_account(instances)).expect("Failed loading bbchain account");
-    println!("BBchain address : {}", bbchain_account.address);
+    // let instances = setup_instances();
+    // let mut bbchain_account = rt.block_on(txemitter.get_bbchain_account(instances)).expect("Failed loading bbchain account");
+    // println!("BBchain address : {}", bbchain_account.address);
 
-    //// rt.block_on(txemitter.open_publishing(setup_instances(), &mut bbchain_account));
+    // //// rt.block_on(txemitter.open_publishing(setup_instances(), &mut bbchain_account));
 
-    let mut dev = DevProxy::create(bbchain_account, waypoint).expect("Failed to construct dev proxy.");
+    // let mut dev = DevProxy::create(bbchain_account, waypoint).expect("Failed to construct dev proxy.");
     
-    // get_waypoint(&mut dev)
+    // // get_waypoint(&mut dev)
 
-    // println!("{}",waypoint.version());
+    // // println!("{}",waypoint.version());
     
-    println!("Compile World");
-    let modules = vec![
-        BBChainModules{
-            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-            deps : vec![
-                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
-            ] 
-        },
-        BBChainModules{
-            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
-            deps : vec![
-                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
-            ] 
-        },
-        BBChainModules{
-            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
-            deps : vec![
-                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
-            ]
-        },      
-    ];
-    for f in &modules {
-        println!("Compiling : {}", f.path);
-        let compiled_path = dev.compile_modules(f.path.clone(), f.deps.clone()).expect("Failed to compile");
-        println!("Publishing Now...");
-        dev.publish_module(&compiled_path).expect("Error publishing module");
-        println!("!! Published !!");
-    }
+    // println!("Compile World");
+    // let modules = vec![
+    //     BBChainModules{
+    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+    //         deps : vec![
+    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
+    //         ] 
+    //     },
+    //     BBChainModules{
+    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
+    //         deps : vec![
+    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+    //             "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
+    //         ] 
+    //     },
+    //     BBChainModules{
+    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
+    //         deps : vec![
+    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+    //             "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+    //             "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
+    //         ]
+    //     },      
+    // ];
+    // for f in &modules {
+    //     println!("Compiling : {}", f.path);
+    //     let compiled_path = dev.compile_modules(f.path.clone(), f.deps.clone()).expect("Failed to compile");
+    //     println!("Publishing Now...");
+    //     dev.publish_module(&compiled_path).expect("Error publishing module");
+    //     println!("!! Published !!");
+    // }
     
     // println!("Hello World");
     // let mut runner = ClusterTestRunner::setup(&args);
@@ -102,7 +102,7 @@ pub fn main() {
     
     
     // // start interactive client
-    // start_interactive(8080, waypoint);
+    start_interactive(8080, waypoint);
 }
 
 struct ClusterTestRunner {

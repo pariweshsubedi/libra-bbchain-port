@@ -71,8 +71,8 @@ impl InteractiveClient {
                     .arg("-f")
                     .arg("http://localhost:9000")
                     .stdin(Stdio::inherit())
-                    .stdout(Stdio::inherit())
-                    .stderr(Stdio::inherit())
+                    // .stdout(Stdio::inherit())
+                    // .stderr(Stdio::inherit())
                     .spawn()
                     .expect("Failed to spawn client process"),
             ),
