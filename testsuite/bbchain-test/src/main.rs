@@ -2,7 +2,7 @@ use std::{
     env, thread,
     process::{Command, Stdio, Child},
     path::Path,
-    time::{Duration},
+    time::{Duration, UNIX_EPOCH},
 };
 use libra_logger::{info, warn};
 use structopt::{clap::ArgGroup, StructOpt};
@@ -21,6 +21,10 @@ use tokio::{
     runtime::{Builder, Runtime},
     time::{delay_for, delay_until, Instant as TokioInstant},
 };
+use libra_types::{
+    waypoint::Waypoint,
+};
+use chrono::{DateTime, Utc};
 
 
 #[derive(StructOpt, Debug)]
@@ -37,6 +41,7 @@ struct BBChainModules{
 
 pub fn main() {
     setup_log();
+    
     let waypoint = "0:0ace663dbcaa390ee9405559f5e4dbb21f6f34b6bfa609de57518d8088428821";
 
     let args = Args::from_args();
@@ -47,58 +52,49 @@ pub fn main() {
     
 
     let mut txemitter = TxEmitter::new();
-    // let instances = setup_instances();
-    // let mut bbchain_account = rt.block_on(txemitter.get_bbchain_account(instances)).expect("Failed loading bbchain account");
-    // println!("BBchain address : {}", bbchain_account.address);
+    let instances = setup_instances();
+    let mut bbchain_account = rt.block_on(txemitter.get_bbchain_account(instances)).expect("Failed loading bbchain account");
+    println!("BBchain address : {}", bbchain_account.address);
 
-    // //// rt.block_on(txemitter.open_publishing(setup_instances(), &mut bbchain_account));
+    //// rt.block_on(txemitter.open_publishing(setup_instances(), &mut bbchain_account));
 
-    // let mut dev = DevProxy::create(bbchain_account, waypoint).expect("Failed to construct dev proxy.");
+    let mut dev = DevProxy::create(bbchain_account, waypoint).expect("Failed to construct dev proxy.");
     
-    // println!("Compile World");
-    // let modules = vec![
-    //     BBChainModules{
-    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-    //         deps : vec![
-    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
-    //         ] 
-    //     },
-    //     // BBChainModules{
-    //     //     path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
-    //     //     deps : vec![
-    //     //         "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-    //     //         "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
-    //     //     ] 
-    //     // },
-    //     // BBChainModules{
-    //     //     path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
-    //     //     deps : vec![
-    //     //         "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-    //     //         "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-    //     //         "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
-    //     //     ]
-    //     // },
-    //     // BBChainModules{
-    //     //     path : "/Users/pariweshsubedi/Desktop/UiS/4thsem/project/modules/move/my_module.move".to_string(),
-    //     //     deps : vec![
-    //     //         "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
-    //     //     ] 
-    //     // },
-    //     // BBChainModules{
-    //     //     path : "/Users/pariweshsubedi/Desktop/UiS/4thsem/project/modules/move/sub_module.move".to_string(),
-    //     //     deps : vec![
-    //     //         "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-    //     //         "/Users/pariweshsubedi/Desktop/UiS/4thsem/project/modules/move/my_module.move".to_string()
-    //     //     ] 
-    //     // },        
-    // ];
-    // for f in &modules {
-    //     println!("Compiling : {}", f.path);
-    //     let compiled_path = dev.compile_modules(f.path.clone(), f.deps.clone()).expect("Failed to compile");
-    //     println!("Publishing Now...");
-    //     dev.publish_module(&compiled_path).expect("Error publishing module");
-    //     println!("!! Published !!");
-    // }
+    // get_waypoint(&mut dev)
+
+    // println!("{}",waypoint.version());
+    
+    println!("Compile World");
+    let modules = vec![
+        BBChainModules{
+            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+            deps : vec![
+                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
+            ] 
+        },
+        BBChainModules{
+            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
+            deps : vec![
+                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
+            ] 
+        },
+        BBChainModules{
+            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
+            deps : vec![
+                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
+            ]
+        },      
+    ];
+    for f in &modules {
+        println!("Compiling : {}", f.path);
+        let compiled_path = dev.compile_modules(f.path.clone(), f.deps.clone()).expect("Failed to compile");
+        println!("Publishing Now...");
+        dev.publish_module(&compiled_path).expect("Error publishing module");
+        println!("!! Published !!");
+    }
     
     // println!("Hello World");
     // let mut runner = ClusterTestRunner::setup(&args);
@@ -106,7 +102,7 @@ pub fn main() {
     
     
     // // start interactive client
-    start_interactive(8080, waypoint);
+    // start_interactive(8080, waypoint);
 }
 
 struct ClusterTestRunner {
@@ -150,10 +146,36 @@ impl ClusterTestRunner {
     }
 }
 
-// fn test_cluster(instances: Vec<Instance>){
-    
-                
-// }
+
+fn get_waypoint(client: &mut DevProxy) {
+    println!("Retrieving the uptodate ledger info...");
+    if let Err(e) = client.test_validator_connection() {
+        println!("Failed to get uptodate ledger info connection: {}", e);
+        return;
+    }
+
+    let latest_epoch_change_li = match client.latest_epoch_change_li() {
+        Some(li) => li,
+        None => {
+            println!("No epoch change LedgerInfo found");
+            return;
+        }
+    };
+    let li_time_str = DateTime::<Utc>::from(
+        UNIX_EPOCH
+            + Duration::from_micros(latest_epoch_change_li.ledger_info().timestamp_usecs()),
+    );
+    match Waypoint::new_epoch_boundary(latest_epoch_change_li.ledger_info()) {
+        Err(e) => println!("Failed to generate a waypoint: {}", e),
+        Ok(waypoint) => println!(
+            "Waypoint (end of epoch {}, time {}): {}",
+            latest_epoch_change_li.ledger_info().epoch(),
+            li_time_str,
+            waypoint
+        ),
+    }
+}
+
 
 fn setup_instances() -> Vec<Instance>{
     let mut instances = Vec::new();

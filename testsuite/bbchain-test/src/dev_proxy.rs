@@ -97,7 +97,7 @@ impl DevProxy {
     /// Construct a new TestClient.
     pub fn create(bbchain_account: AccountData, waypointStr: &str) -> Result<Self> {
         let waypoint = Waypoint::from_str(waypointStr).expect("waypoint failure");
-        let url = Url::parse("https://localhost:8000")?;
+        let url = Url::parse("http://localhost:8080")?;
         let client = LibraClient::new(url, waypoint)?;
 
         let accounts = vec![bbchain_account.clone()];
