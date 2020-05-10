@@ -97,8 +97,8 @@ pub fn main() {
     // }
     
     // println!("Hello World");
-    // let mut runner = ClusterTestRunner::setup(&args);
-    // rt.block_on(runner.start_job());
+    let mut runner = ClusterTestRunner::setup(&args);
+    rt.block_on(runner.start_job());
     
     
     // // start interactive client
