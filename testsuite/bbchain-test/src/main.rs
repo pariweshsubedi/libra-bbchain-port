@@ -43,65 +43,58 @@ pub fn main() {
     setup_log();
     
     let waypoint = "0:0ace663dbcaa390ee9405559f5e4dbb21f6f34b6bfa609de57518d8088428821";
-
     let args = Args::from_args();
     let mut rt = Runtime::new().unwrap();
 
-    //compile modules
     println!("Hello World");
     
-
+    // Initialize
     let mut txemitter = TxEmitter::new();
-    // let instances = setup_instances();
-    // let mut bbchain_account = rt.block_on(txemitter.get_bbchain_account(instances)).expect("Failed loading bbchain account");
-    // println!("BBchain address : {}", bbchain_account.address);
+    let instances = setup_instances();
+    let mut bbchain_account = rt.block_on(txemitter.get_bbchain_account(instances)).expect("Failed loading bbchain account");
+    println!("BBchain address : {}", bbchain_account.address);
 
-    // //// rt.block_on(txemitter.open_publishing(setup_instances(), &mut bbchain_account));
+    let mut dev = DevProxy::create(bbchain_account, waypoint).expect("Failed to construct dev proxy.");
 
-    // let mut dev = DevProxy::create(bbchain_account, waypoint).expect("Failed to construct dev proxy.");
-    
-    // // get_waypoint(&mut dev)
+    println!("Compile World");
+    let modules = vec![
+        BBChainModules{
+            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+            deps : vec![
+                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
+            ] 
+        },
+        BBChainModules{
+            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
+            deps : vec![
+                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
+            ] 
+        },
+        BBChainModules{
+            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
+            deps : vec![
+                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
+            ]
+        },      
+    ];
 
-    // // println!("{}",waypoint.version());
+    // deploy modules
+    for f in &modules {
+        println!("Compiling : {}", f.path);
+        let compiled_path = dev.compile_modules(f.path.clone(), f.deps.clone()).expect("Failed to compile");
+        println!("Publishing Now...");
+        dev.publish_module(&compiled_path).expect("Error publishing module");
+        println!("!! Published !!");
+    }
     
-    // println!("Compile World");
-    // let modules = vec![
-    //     BBChainModules{
-    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-    //         deps : vec![
-    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
-    //         ] 
-    //     },
-    //     BBChainModules{
-    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
-    //         deps : vec![
-    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-    //             "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
-    //         ] 
-    //     },
-    //     BBChainModules{
-    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
-    //         deps : vec![
-    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-    //             "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-    //             "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
-    //         ]
-    //     },      
-    // ];
-    // for f in &modules {
-    //     println!("Compiling : {}", f.path);
-    //     let compiled_path = dev.compile_modules(f.path.clone(), f.deps.clone()).expect("Failed to compile");
-    //     println!("Publishing Now...");
-    //     dev.publish_module(&compiled_path).expect("Error publishing module");
-    //     println!("!! Published !!");
-    // }
-    
-    // println!("Hello World");
+    // run test
     let mut runner = ClusterTestRunner::setup(&args);
     rt.block_on(runner.start_job());
     
-    
-    // // start interactive client
+    // start interactive client
     start_interactive(8080, waypoint);
 }
 

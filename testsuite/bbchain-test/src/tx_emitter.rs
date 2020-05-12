@@ -174,7 +174,7 @@ impl TxEmitter {
         //     "Will use {} workers per AC with total {} AC clients",
         //     workers_per_ac, num_clients
         // );
-        let accounts_per_client = 3;
+        let accounts_per_client = 300;
         let num_clients = 1;
         let num_accounts = accounts_per_client * num_clients;
         
@@ -182,7 +182,7 @@ impl TxEmitter {
             "Will create {} accounts_per_client with total {} accounts",
             accounts_per_client, num_accounts
         );
-        self.mint_accounts(num_accounts, instances).await?;
+        self.mint_accounts(num_accounts, instances.clone()).await?;
 
         
         let all_accounts = self.accounts.split_off(self.accounts.len() - num_accounts);
@@ -193,29 +193,30 @@ impl TxEmitter {
         let tokio_handle = Handle::current();
         let mut all_accounts = all_accounts.into_iter();
         let mut workers = vec![];
-        let workers_per_ac = 2;
+        let workers_per_ac = 1;
 
         println!("All addresses: {:?}", all_addresses);
-        // for instance in &instances {
-        //     for _ in 0..workers_per_ac {
-        //         let client = self.make_client(&instance);
-        //         let accounts = (&mut all_accounts).take(req.accounts_per_client).collect();
-        //         let all_addresses = all_addresses.clone();
-        //         let stop = stop.clone();
-        //         let params = req.thread_params.clone();
-        //         let stats = Arc::clone(&stats);
-        //         let worker = SubmissionWorker {
-        //             accounts,
-        //             client,
-        //             all_addresses,
-        //             stop,
-        //             params,
-        //             stats,
-        //         };
-        //         let join_handle = tokio_handle.spawn(worker.run().boxed());
-        //         workers.push(Worker { join_handle });
-        //     }
-        // }
+        for instance in &instances {
+            for _ in 0..workers_per_ac {
+                let client = self.make_client(&instance);
+                let accounts = (&mut all_accounts).take(accounts_per_client).collect();
+                let all_addresses = all_addresses.clone();
+                let stop = stop.clone();
+                // let params = req.thread_params.clone();
+                let params = EmitThreadParams::default();
+                let stats = Arc::clone(&stats);
+                let worker = SubmissionWorker {
+                    accounts,
+                    client,
+                    all_addresses,
+                    stop,
+                    params,
+                    stats,
+                };
+                let join_handle = tokio_handle.spawn(worker.run().boxed());
+                workers.push(Worker { join_handle });
+            }
+        }
         Ok(EmitJob {
             workers,
             stop,
