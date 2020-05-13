@@ -672,7 +672,7 @@ impl DevProxy {
         )
     }
 
-    // /// Execute custom script
+    /// Execute custom script
     // pub fn execute_script(&mut self, compiled_path: &str) -> Result<()> {
     //     let script_bytes = fs::read(compiled_path)?;
     //     let arguments: Vec<_> = space_delim_strings[3..]

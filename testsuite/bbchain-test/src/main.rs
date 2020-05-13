@@ -7,7 +7,7 @@ use std::{
 use libra_logger::{info, warn};
 use structopt::{clap::ArgGroup, StructOpt};
 use libra_temppath::TempPath;
-
+use anyhow::{bail, ensure, format_err, Error, Result};
 mod client;
 mod tx_emitter;
 mod instance;
@@ -39,6 +39,12 @@ struct BBChainModules{
     pub deps: Vec<String>,
 }
 
+struct BBChainScript{
+    pub desc: String,
+    pub path: String,
+    pub compiled_path: String
+}
+
 pub fn main() {
     setup_log();
     
@@ -56,46 +62,84 @@ pub fn main() {
 
     let mut dev = DevProxy::create(bbchain_account, waypoint).expect("Failed to construct dev proxy.");
 
-    println!("Compile World");
-    let modules = vec![
-        BBChainModules{
-            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-            deps : vec![
-                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
-            ] 
-        },
-        BBChainModules{
-            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
-            deps : vec![
-                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
-            ] 
-        },
-        BBChainModules{
-            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
-            deps : vec![
-                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
-            ]
-        },      
-    ];
+    // println!("Compile World");
+    // let modules = vec![
+    //     BBChainModules{
+    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+    //         deps : vec![
+    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
+    //         ] 
+    //     },
+    //     BBChainModules{
+    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
+    //         deps : vec![
+    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+    //             "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
+    //         ] 
+    //     },
+    //     BBChainModules{
+    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
+    //         deps : vec![
+    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+    //             "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+    //             "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
+    //         ]
+    //     },      
+    // ];
 
-    // deploy modules
-    for f in &modules {
-        println!("Compiling : {}", f.path);
-        let compiled_path = dev.compile_modules(f.path.clone(), f.deps.clone()).expect("Failed to compile");
-        println!("Publishing Now...");
-        dev.publish_module(&compiled_path).expect("Error publishing module");
-        println!("!! Published !!");
-    }
+    // // deploy modules
+    // for f in &modules {
+    //     println!("Compiling : {}", f.path);
+    //     let compiled_path = dev.compile_modules(f.path.clone(), f.deps.clone()).expect("Failed to compile");
+    //     println!("Publishing Now...");
+    //     dev.publish_module(&compiled_path).expect("Error publishing module");
+    //     println!("!! Published !!");
+    // }
+
+
+    
+    let compiled_scripts = compile_scripts(&mut dev).expect("failed to compile scripts");
+
     
     // run test
-    let mut runner = ClusterTestRunner::setup(&args);
-    rt.block_on(runner.start_job());
+    // let mut runner = ClusterTestRunner::setup(&args);
+    // rt.block_on(runner.start_job());
     
     // start interactive client
-    start_interactive(8080, waypoint);
+    // start_interactive(8080, waypoint);
+}
+
+impl BBChainScript{
+    fn setCopiledPath(&mut self, path: String){
+        self.compiled_path = path;
+    }
+}
+
+fn compile_scripts(dev: &mut DevProxy) -> Result<Vec<BBChainScript>> {
+
+    let global_deps = vec![
+        "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+        "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+        "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
+        "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
+    ];
+
+    let mut scripts = vec![
+        BBChainScript{
+            desc: "has_issuer_resource".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/has_issuer_resource.move".to_string(),
+            compiled_path: "".to_string(),
+        }
+    ];
+
+    for script in &mut scripts {
+        println!("Compiling : {}", script.path);
+        let compiled_path = dev.compile_modules(script.path.clone(), global_deps.clone()).expect("Failed to compile");
+        script.setCopiledPath(compiled_path);
+        println!("compiled path : {}", script.compiled_path);
+    };
+
+    Ok(scripts)
 }
 
 struct ClusterTestRunner {
