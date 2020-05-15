@@ -673,17 +673,17 @@ impl DevProxy {
     }
 
     /// Execute custom script
-    // pub fn execute_script(&mut self, compiled_path: &str) -> Result<()> {
-    //     let script_bytes = fs::read(compiled_path)?;
-    //     let arguments: Vec<_> = space_delim_strings[3..]
-    //         .iter()
-    //         .filter_map(|arg| parse_as_transaction_argument_for_client(arg).ok())
-    //         .collect();
-    //     // TODO: support type arguments in the client.
-    //     self.submit_program(
-    //         TransactionPayload::Script(Script::new(script_bytes, vec![], arguments)),
-    //     )
-    // }
+    pub fn execute_script(&mut self, compiled_path: &str, args:  &[&str]) -> Result<()> {
+        let script_bytes = fs::read(compiled_path)?;
+        let arguments: Vec<_> = args
+            .iter()
+            .filter_map(|arg| parse_as_transaction_argument_for_client(arg).ok())
+            .collect();
+        // TODO: support type arguments in the client.
+        self.submit_program(
+            TransactionPayload::Script(Script::new(script_bytes, vec![], arguments)),
+        )
+    }
 
     // /// Get the latest account state from validator.
     // pub fn get_latest_account_state(

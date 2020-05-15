@@ -50,10 +50,12 @@ use util::retry;
 
 const MAX_TXN_BATCH_SIZE: usize = 100; // Max transactions per account in mempool
 
+
 pub struct TxEmitter {
     accounts: Vec<AccountData>,
     mint_key_pair: KeyPair<Ed25519PrivateKey, Ed25519PublicKey>,
     http_client: Client,
+    compiled_scripts: Vec<BBChainScript>,
 }
 
 pub struct EmitJob {
@@ -113,11 +115,12 @@ impl EmitJobRequest {
 }
 
 impl TxEmitter {
-    pub fn new() -> Self {
+    pub fn new(compiled_scripts: Vec<BBChainScript>) -> Self {
         Self {
             accounts: vec![],
             mint_key_pair: Self::get_mint_key_pair(),
             http_client: Client::new(),
+            compiled_scripts: compiled_scripts,
         }
     }
 
@@ -174,7 +177,7 @@ impl TxEmitter {
         //     "Will use {} workers per AC with total {} AC clients",
         //     workers_per_ac, num_clients
         // );
-        let accounts_per_client = 300;
+        let accounts_per_client = 1;
         let num_clients = 1;
         let num_accounts = accounts_per_client * num_clients;
         
@@ -672,5 +675,19 @@ impl AccountData {
         AuthenticationKey::ed25519(&self.key_pair.public_key)
             .prefix()
             .to_vec()
+    }
+}
+
+
+#[derive(Clone)]
+pub struct BBChainScript{
+    pub desc: String,
+    pub path: String,
+    pub compiled_path: String
+}
+
+impl BBChainScript{
+    pub fn setCopiledPath(&mut self, path: String){
+        self.compiled_path = path;
     }
 }

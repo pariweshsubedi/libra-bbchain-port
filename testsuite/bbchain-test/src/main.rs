@@ -8,14 +8,14 @@ use libra_logger::{info, warn};
 use structopt::{clap::ArgGroup, StructOpt};
 use libra_temppath::TempPath;
 use anyhow::{bail, ensure, format_err, Error, Result};
-mod client;
-mod tx_emitter;
-mod instance;
-mod dev_proxy;
-mod libra_client;
+pub mod client;
+pub mod dev_proxy;
+pub mod instance;
+pub mod libra_client;
+pub mod tx_emitter;
 
 use dev_proxy::{DevProxy};
-use tx_emitter::{TxEmitter, AccountData};
+use tx_emitter::{TxEmitter, AccountData, BBChainScript};
 use instance::{Instance};
 use tokio::{
     runtime::{Builder, Runtime},
@@ -39,12 +39,6 @@ struct BBChainModules{
     pub deps: Vec<String>,
 }
 
-struct BBChainScript{
-    pub desc: String,
-    pub path: String,
-    pub compiled_path: String
-}
-
 pub fn main() {
     setup_log();
     
@@ -55,7 +49,7 @@ pub fn main() {
     println!("Hello World");
     
     // Initialize
-    let mut txemitter = TxEmitter::new();
+    let mut txemitter = TxEmitter::new(vec![]);
     let instances = setup_instances();
     let mut bbchain_account = rt.block_on(txemitter.get_bbchain_account(instances)).expect("Failed loading bbchain account");
     println!("BBchain address : {}", bbchain_account.address);
@@ -98,21 +92,22 @@ pub fn main() {
 
 
     
-    let compiled_scripts = compile_scripts(&mut dev).expect("failed to compile scripts");
+    let mut compiled_scripts = compile_scripts(&mut dev).expect("failed to compile scripts");
+
+    
+    // for script in &mut compiled_scripts {
+    //     println!("Executing : {}", script.compiled_path);
+    //     let arguments = vec![];
+    //     dev.execute_script(&*script.compiled_path, &arguments);
+    // }
 
     
     // run test
-    // let mut runner = ClusterTestRunner::setup(&args);
-    // rt.block_on(runner.start_job());
+    let mut runner = ClusterTestRunner::setup(&args,compiled_scripts.clone());
+    rt.block_on(runner.start_job(compiled_scripts));
     
     // start interactive client
     // start_interactive(8080, waypoint);
-}
-
-impl BBChainScript{
-    fn setCopiledPath(&mut self, path: String){
-        self.compiled_path = path;
-    }
 }
 
 fn compile_scripts(dev: &mut DevProxy) -> Result<Vec<BBChainScript>> {
@@ -150,8 +145,8 @@ struct ClusterTestRunner {
 
 impl ClusterTestRunner {
     /// Discovers cluster, setup log, etc
-    pub fn setup(args: &Args) -> Self {
-        let tx_emitter = TxEmitter::new();
+    pub fn setup(args: &Args, compiled_scripts: Vec<BBChainScript>) -> Self {
+        let tx_emitter = TxEmitter::new(compiled_scripts);
         let instances = setup_instances();
         let runtime = Builder::new()
             .threaded_scheduler()
@@ -168,11 +163,11 @@ impl ClusterTestRunner {
         }
     }
 
-    pub async fn start_job(&self){
+    pub async fn start_job(&self, compiled_scripts: Vec<BBChainScript>){
         println!("Starting job");
         // self.tx_emitter.start_job(self.instances);
         let time = Duration::from_secs(1);
-        let mut emitter = TxEmitter::new();
+        let mut emitter = TxEmitter::new(compiled_scripts);
         let job = emitter
             .start_job(setup_instances())
             .await
