@@ -501,6 +501,13 @@ impl SubmissionWorker {
                 println!("Remaining accounts : {}", self.accounts.len());
                 let (fac_account, request) = self.build_sub_issuer_request(&org_account);
                 requests.push(request);
+
+                // build course
+                for faculty_index in 0..NUM_COURSES{
+                    println!("Remaining accounts : {}", self.accounts.len());
+                    let (course_account, request) = self.build_sub_issuer_request(&fac_account);
+                    requests.push(request);
+                }
             }
         }
     
