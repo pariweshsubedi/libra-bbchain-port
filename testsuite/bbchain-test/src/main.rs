@@ -103,8 +103,8 @@ pub fn main() {
 
     
     // run test
-    // let mut runner = ClusterTestRunner::setup(&args,compiled_scripts.clone());
-    // rt.block_on(runner.start_job(compiled_scripts));
+    let mut runner = ClusterTestRunner::setup(&args,vec![]);
+    rt.block_on(runner.start_job(compiled_scripts.clone()));
     
     // start interactive client
     // start_interactive(8080, waypoint);
@@ -119,50 +119,50 @@ fn compile_scripts(dev: &mut DevProxy) -> Result<Vec<BBChainScript>> {
 
     let mut scripts = vec![
         BBChainScript{
-            desc: "aggregate_credenail_proof".to_string(),
-            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/aggregate_credenail_proof.move".to_string(),
-            compiled_path: "".to_string(),
-        },
-        BBChainScript{
-            desc: "init_holder".to_string(),
-            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/init_holder.move".to_string(),
-            compiled_path: "".to_string(),
-        },
-        BBChainScript{
             desc: "init_root_issuer".to_string(),
             path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/init_root_issuer.move".to_string(),
             compiled_path: "".to_string(),
         },
-        BBChainScript{
-            desc: "register_credential".to_string(),
-            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_credential.move".to_string(),
-            compiled_path: "".to_string(),
-        },
-        BBChainScript{
-            desc: "register_holder".to_string(),
-            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_holder.move".to_string(),
-            compiled_path: "".to_string(),
-        },
-        BBChainScript{
-            desc: "register_sub_issuer".to_string(),
-            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_sub_issuer.move".to_string(),
-            compiled_path: "".to_string(),
-        },
-        BBChainScript{
-            desc: "claim_credential_proof".to_string(),
-            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/holder/claim_credential_proof.move".to_string(),
-            compiled_path: "".to_string(),
-        },
-        BBChainScript{
-            desc: "sign_credential".to_string(),
-            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/owner/sign_credential.move".to_string(),
-            compiled_path: "".to_string(),
-        },
-        BBChainScript{
-            desc: "verify_digest".to_string(),
-            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/verifier/verify_digest.move".to_string(),
-            compiled_path: "".to_string(),
-        },
+        // BBChainScript{
+        //     desc: "aggregate_credenail_proof".to_string(),
+        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/aggregate_credenail_proof.move".to_string(),
+        //     compiled_path: "".to_string(),
+        // },
+        // BBChainScript{
+        //     desc: "init_holder".to_string(),
+        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/init_holder.move".to_string(),
+        //     compiled_path: "".to_string(),
+        // },
+        // BBChainScript{
+        //     desc: "register_credential".to_string(),
+        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_credential.move".to_string(),
+        //     compiled_path: "".to_string(),
+        // },
+        // BBChainScript{
+        //     desc: "register_holder".to_string(),
+        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_holder.move".to_string(),
+        //     compiled_path: "".to_string(),
+        // },
+        // BBChainScript{
+        //     desc: "register_sub_issuer".to_string(),
+        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_sub_issuer.move".to_string(),
+        //     compiled_path: "".to_string(),
+        // },
+        // BBChainScript{
+        //     desc: "claim_credential_proof".to_string(),
+        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/holder/claim_credential_proof.move".to_string(),
+        //     compiled_path: "".to_string(),
+        // },
+        // BBChainScript{
+        //     desc: "sign_credential".to_string(),
+        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/owner/sign_credential.move".to_string(),
+        //     compiled_path: "".to_string(),
+        // },
+        // BBChainScript{
+        //     desc: "verify_digest".to_string(),
+        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/verifier/verify_digest.move".to_string(),
+        //     compiled_path: "".to_string(),
+        // },
     ];
 
     for script in &mut scripts {

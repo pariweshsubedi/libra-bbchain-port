@@ -3,7 +3,10 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{instance::Instance};
+use crate::{instance::Instance,DevProxy};
+use cli::{
+    commands::{is_address},
+};
 use config_builder::ValidatorConfig;
 use std::{
     slice,
@@ -38,12 +41,13 @@ use tokio::runtime::{Handle, Runtime};
 
 use futures::{executor::block_on, future::FutureExt};
 use libra_json_rpc::JsonRpcAsyncClient;
-use libra_types::transaction::SignedTransaction;
+use libra_types::transaction::{SignedTransaction,parse_as_transaction_argument,TransactionArgument};
 use reqwest::{Client, Url};
 use std::{
     cmp::{max, min},
     str::FromStr,
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    fs,
 };
 use tokio::{task::JoinHandle, time};
 use util::retry;
@@ -93,7 +97,7 @@ pub struct EmitThreadParams {
 impl Default for EmitThreadParams {
     fn default() -> Self {
         Self {
-            wait_millis: 0,
+            wait_millis: 100,
             wait_committed: true,
         }
     }
@@ -190,7 +194,7 @@ impl TxEmitter {
         //     "Will use {} workers per AC with total {} AC clients",
         //     workers_per_ac, num_clients
         // );
-        let accounts_per_client = TOTAL_ACCOUNTS/instances.len();
+        let accounts_per_client = 10;//TOTAL_ACCOUNTS/instances.len();
         let num_clients = 1;
         let num_accounts = accounts_per_client * num_clients;
         
@@ -221,6 +225,7 @@ impl TxEmitter {
                 // let params = req.thread_params.clone();
                 let params = EmitThreadParams::default();
                 let stats = Arc::clone(&stats);
+                let compiled_scripts = self.compiled_scripts.clone();
                 let worker = SubmissionWorker {
                     accounts,
                     client,
@@ -228,9 +233,14 @@ impl TxEmitter {
                     stop,
                     params,
                     stats,
+                    compiled_scripts
                 };
+
+                println!("worker created");
                 let join_handle = tokio_handle.spawn(worker.run().boxed());
+                println!("join handle ran");
                 workers.push(Worker { join_handle });
+                println!("pushed worker");
             }
         }
         Ok(EmitJob {
@@ -394,6 +404,7 @@ struct SubmissionWorker {
     stop: Arc<AtomicBool>,
     params: EmitThreadParams,
     stats: Arc<TxStats>,
+    compiled_scripts: Vec<BBChainScript>
 }
 
 
@@ -464,40 +475,42 @@ impl SubmissionWorker {
     async fn run(mut self) -> Vec<AccountData> {
         let wait = Duration::from_millis(self.params.wait_millis);
         while !self.stop.load(Ordering::Relaxed) {
-            let requests = self.gen_requests();
-            let num_requests = requests.len();
-            for request in requests {
-                self.stats.submitted.fetch_add(1, Ordering::Relaxed);
-                let wait_util = Instant::now() + wait;
-                let resp = self.client.submit_transaction(request).await;
-                if let Err(e) = resp {
-                    warn!("[{:?}] Failed to submit request: {:?}", self.client, e);
-                }
-                let now = Instant::now();
-                if wait_util > now {
-                    time::delay_for(wait_util - now).await;
-                }
-            }
-            if self.params.wait_committed {
-                if let Err(uncommitted) =
-                    wait_for_accounts_sequence(&self.client, &mut self.accounts).await
-                {
-                    self.stats
-                        .committed
-                        .fetch_add((num_requests - uncommitted.len()) as u64, Ordering::Relaxed);
-                    self.stats
-                        .expired
-                        .fetch_add(uncommitted.len() as u64, Ordering::Relaxed);
-                    info!(
-                        "[{:?}] Transactions were not committed before expiration: {:?}",
-                        self.client, uncommitted
-                    );
-                } else {
-                    self.stats
-                        .committed
-                        .fetch_add(num_requests as u64, Ordering::Relaxed);
-                }
-            }
+            // println!("Generating requests ....");
+            // let requests = self.gen_requests();
+            // println!("Generated requests");
+            // let num_requests = requests.len();
+            // for request in requests {
+            //     self.stats.submitted.fetch_add(1, Ordering::Relaxed);
+            //     let wait_util = Instant::now() + wait;
+            //     let resp = self.client.submit_transaction(request).await;
+            //     if let Err(e) = resp {
+            //         warn!("[{:?}] Failed to submit request: {:?}", self.client, e);
+            //     }
+            //     let now = Instant::now();
+            //     if wait_util > now {
+            //         time::delay_for(wait_util - now).await;
+            //     }
+            // }
+            // if self.params.wait_committed {
+            //     if let Err(uncommitted) =
+            //         wait_for_accounts_sequence(&self.client, &mut self.accounts).await
+            //     {
+            //         self.stats
+            //             .committed
+            //             .fetch_add((num_requests - uncommitted.len()) as u64, Ordering::Relaxed);
+            //         self.stats
+            //             .expired
+            //             .fetch_add(uncommitted.len() as u64, Ordering::Relaxed);
+            //         info!(
+            //             "[{:?}] Transactions were not committed before expiration: {:?}",
+            //             self.client, uncommitted
+            //         );
+            //     } else {
+            //         self.stats
+            //             .committed
+            //             .fetch_add(num_requests as u64, Ordering::Relaxed);
+            //     }
+            // }
         }
         self.accounts
     }
@@ -505,21 +518,106 @@ impl SubmissionWorker {
     fn gen_requests(&mut self) -> Vec<SignedTransaction> {
         let mut rng = ThreadRng::default();
         let batch_size = max(MAX_TXN_BATCH_SIZE, self.accounts.len());
+        let script_compiled_path = self.get_bbchain_compiled_script_path("init_root_issuer", self.compiled_scripts.clone());
         let accounts = self
             .accounts
             .iter_mut()
             .choose_multiple(&mut rng, batch_size);
         let mut requests = Vec::with_capacity(accounts.len());
         for sender in accounts {
-            let receiver = self
-                .all_addresses
-                .choose(&mut rng)
-                .expect("all_addresses can't be empty");
-            let request = gen_transfer_txn_request(sender, receiver, Vec::new(), 1);
+            let owner1 = self.all_addresses.choose(&mut rng).expect("all_addresses can't be empty");
+            let owner2 = self.all_addresses.choose(&mut rng).expect("all_addresses can't be empty");
+            
+            // let request = gen_transfer_txn_request(sender, receiver, Vec::new(), 1);
+            let request = gen_bbchain_txn_request(&*self.compiled_scripts[script_compiled_path].compiled_path, 
+                sender, 
+                vec![
+                    owner1.to_string(),
+                    owner2.to_string(),
+                    "2".to_string()
+                ]
+            );
             requests.push(request);
         }
         requests
     }
+
+    fn get_bbchain_compiled_script_path(&self, script_desc: &str, compiled_scripts: Vec<BBChainScript>) -> usize {
+        let mut i:usize = 0;
+        for script in compiled_scripts {
+            i= i+1;
+            if(&script.desc == script_desc){
+                return i;
+                // return &*script.compiled_path
+            }
+            // let arguments = vec![];
+            // dev.execute_script(&*script.compiled_path, &arguments);
+        }
+        panic!("BBchain script not found");
+    }
+}
+
+// create_txn_to_submit
+fn gen_bbchain_transaction_to_submit(
+    program: TransactionPayload,
+    sender_account: &mut AccountData
+) -> SignedTransaction {
+    let transaction = create_user_txn(
+        &sender_account.key_pair,
+        program,
+        sender_account.address,
+        sender_account.sequence_number,
+        MAX_GAS_AMOUNT,
+        GAS_UNIT_PRICE,
+        TXN_EXPIRATION_SECONDS,
+    ).expect("Failed to create signed transaction");
+    sender_account.sequence_number += 1;
+    transaction
+}
+
+
+fn gen_bbchain_txn_request(
+    script_compiled_path: &str,
+    sender: &mut AccountData,
+    args: Vec<String>,
+)-> SignedTransaction {
+    let script_bytes = fs::read(script_compiled_path).expect("Error reading compiled script");
+    let arguments: Vec<_> = args
+        .iter()
+        .filter_map(|arg| parse_as_transaction_argument_for_client(&*arg).ok())
+        .collect();
+    
+    gen_bbchain_transaction_to_submit(
+        TransactionPayload::Script(Script::new(script_bytes, vec![], arguments)),
+        sender
+    )
+    
+}
+
+fn parse_as_transaction_argument_for_client(s: &str) -> Result<TransactionArgument> {
+    if is_address(s) {
+        let account_address = DevProxy::address_from_strings(s)?;
+        return Ok(TransactionArgument::Address(account_address));
+    }
+    parse_as_transaction_argument(s)
+}
+
+fn gen_transfer_txn_request(
+    sender: &mut AccountData,
+    receiver: &AccountAddress,
+    receiver_auth_key_prefix: Vec<u8>,
+    num_coins: u64,
+) -> SignedTransaction {
+    gen_submit_transaction_request(
+        transaction_builder::encode_transfer_with_metadata_script(
+            lbr_type_tag(),
+            receiver,
+            receiver_auth_key_prefix,
+            num_coins,
+            vec![],
+        ),
+        sender,
+    )
 }
 
 async fn wait_for_accounts_sequence(
@@ -615,24 +713,6 @@ fn gen_mint_request(faucet_account: &mut AccountData, num_coins: u64) -> SignedT
             num_coins,
         ),
         faucet_account,
-    )
-}
-
-fn gen_transfer_txn_request(
-    sender: &mut AccountData,
-    receiver: &AccountAddress,
-    receiver_auth_key_prefix: Vec<u8>,
-    num_coins: u64,
-) -> SignedTransaction {
-    gen_submit_transaction_request(
-        transaction_builder::encode_transfer_with_metadata_script(
-            lbr_type_tag(),
-            receiver,
-            receiver_auth_key_prefix,
-            num_coins,
-            vec![],
-        ),
-        sender,
     )
 }
 
@@ -749,7 +829,7 @@ impl AccountData {
 }
 
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct BBChainScript{
     pub desc: String,
     pub path: String,

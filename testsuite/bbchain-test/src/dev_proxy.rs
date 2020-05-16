@@ -1018,7 +1018,7 @@ impl DevProxy {
     }
 
 
-    fn address_from_strings(data: &str) -> Result<AccountAddress> {
+    pub fn address_from_strings(data: &str) -> Result<AccountAddress> {
         let account_vec: Vec<u8> = hex::decode(data.parse::<String>()?)?;
         ensure!(
             account_vec.len() == AccountAddress::LENGTH,
