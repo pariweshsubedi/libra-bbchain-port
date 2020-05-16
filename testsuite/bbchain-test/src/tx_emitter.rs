@@ -49,7 +49,20 @@ use tokio::{task::JoinHandle, time};
 use util::retry;
 
 const MAX_TXN_BATCH_SIZE: usize = 100; // Max transactions per account in mempool
+const MAX_GAS_AMOUNT: u64 = 1_000_000;
+const GAS_UNIT_PRICE: u64 = 0;
+const TXN_EXPIRATION_SECONDS: i64 = 50;
+const TXN_MAX_WAIT: Duration = Duration::from_secs(TXN_EXPIRATION_SECONDS as u64 + 30);
+const LIBRA_PER_NEW_ACCOUNT: u64 = 1_000_000_000;
 
+
+const NUM_ORG: usize = 1;
+const NUM_FACULTIES: usize = 2;
+const NUM_COURSES: usize = 1;
+const NUM_COURSE_WORKS: usize = 4;
+const NUM_OWNERS_PER_COURSE: usize = 3;
+const NUM_STUDENTS_PER_COURSE: usize = 1;
+const TOTAL_ACCOUNTS: usize = NUM_ORG * NUM_FACULTIES * NUM_COURSES * NUM_COURSE_WORKS;
 
 pub struct TxEmitter {
     accounts: Vec<AccountData>,
@@ -177,7 +190,7 @@ impl TxEmitter {
         //     "Will use {} workers per AC with total {} AC clients",
         //     workers_per_ac, num_clients
         // );
-        let accounts_per_client = 1;
+        let accounts_per_client = TOTAL_ACCOUNTS/instances.len();
         let num_clients = 1;
         let num_accounts = accounts_per_client * num_clients;
         
@@ -383,6 +396,69 @@ struct SubmissionWorker {
     stats: Arc<TxStats>,
 }
 
+
+struct BBChainIssuerEntity{
+    account: AccountData,
+    sub_issuers: Vec<BBChainIssuerEntity>,
+    holders: Vec<AccountData>,
+    digests: Vec<Vec<u8>>,
+}
+
+struct BBChainHolderEntity{
+    account: AccountData,
+    issuers: Vec<AccountData>
+}
+
+// All initialized organizations
+struct BBChainResponse{
+    organizations: Vec<BBChainIssuerEntity>
+}
+
+
+// // const NUM_ORG: usize = 1;
+// // const NUM_FACULTIES: usize = 2;
+// // const NUM_COURSES: usize = 1;
+// // const NUM_COURSE_WORKS: usize = 4;
+// // const NUM_OWNERS_PER_COURSE: usize = 3;
+// // const NUM_STUDENTS_PER_COURSE: usize = 1;
+// // const TOTAL_ACCOUNTS: usize = NUM_ORG * NUM_FACULTIES * NUM_COURSES * NUM_COURSE_WORKS;
+
+// // Creates organization structure on chain
+// //
+// fn init_org(libra_accounts: Vec<AccountData>) -> Result<BBChainResponse>{
+//     let organizations = vec![];
+//     for org_index in 1..NUM_ORG {
+//         //register root issuer
+//         let digests = vec![""];
+
+//         for faculty_index in 1..NUM_FACULTIES {
+//             //register sub issuer
+//             for course_index in 1..NUM_COURSES {
+//                 //register sub issuer with NUM_OWNERS_PER_COURSE
+
+//                 for student_index in 1..NUM_STUDENTS_PER_COURSE{
+//                     //register student to all issuers
+                    
+//                     //register student credential
+
+//                 }
+
+//                 // owner signs the credentials
+
+
+//                 // student claims the credential
+//             }
+//         }
+        
+//     }
+
+//     Ok(BBChainResponse{
+//         organizations: organizations
+//     })
+// }
+
+
+
 impl SubmissionWorker {
     #[allow(clippy::collapsible_if)]
     async fn run(mut self) -> Vec<AccountData> {
@@ -509,12 +585,6 @@ async fn query_sequence_numbers(
     }
     Ok(result)
 }
-
-const MAX_GAS_AMOUNT: u64 = 1_000_000;
-const GAS_UNIT_PRICE: u64 = 0;
-const TXN_EXPIRATION_SECONDS: i64 = 50;
-const TXN_MAX_WAIT: Duration = Duration::from_secs(TXN_EXPIRATION_SECONDS as u64 + 30);
-const LIBRA_PER_NEW_ACCOUNT: u64 = 1_000_000_000;
 
 fn gen_submit_transaction_request(
     script: Script,

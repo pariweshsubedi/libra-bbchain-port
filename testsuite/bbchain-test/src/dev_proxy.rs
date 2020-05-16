@@ -1005,7 +1005,7 @@ impl DevProxy {
         self.wallet = wallet;
     }
 
-    pub fn compile_modules(&mut self, module_path: String, deps: Vec<String>) -> Result<String>{
+    pub fn compile_source(&mut self, module_path: String, deps: Vec<String>) -> Result<String>{
         let output_path = self.
                         compile_program(
                             true, 

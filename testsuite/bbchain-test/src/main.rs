@@ -84,7 +84,7 @@ pub fn main() {
     // // deploy modules
     // for f in &modules {
     //     println!("Compiling : {}", f.path);
-    //     let compiled_path = dev.compile_modules(f.path.clone(), f.deps.clone()).expect("Failed to compile");
+    //     let compiled_path = dev.compile_source(f.path.clone(), f.deps.clone()).expect("Failed to compile");
     //     println!("Publishing Now...");
     //     dev.publish_module(&compiled_path).expect("Error publishing module");
     //     println!("!! Published !!");
@@ -103,8 +103,8 @@ pub fn main() {
 
     
     // run test
-    let mut runner = ClusterTestRunner::setup(&args,compiled_scripts.clone());
-    rt.block_on(runner.start_job(compiled_scripts));
+    // let mut runner = ClusterTestRunner::setup(&args,compiled_scripts.clone());
+    // rt.block_on(runner.start_job(compiled_scripts));
     
     // start interactive client
     // start_interactive(8080, waypoint);
@@ -114,22 +114,60 @@ fn compile_scripts(dev: &mut DevProxy) -> Result<Vec<BBChainScript>> {
 
     let global_deps = vec![
         "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-        "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-        "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
-        "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
+        "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/".to_string(),
     ];
 
     let mut scripts = vec![
         BBChainScript{
-            desc: "has_issuer_resource".to_string(),
-            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/has_issuer_resource.move".to_string(),
+            desc: "aggregate_credenail_proof".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/aggregate_credenail_proof.move".to_string(),
             compiled_path: "".to_string(),
-        }
+        },
+        BBChainScript{
+            desc: "init_holder".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/init_holder.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "init_root_issuer".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/init_root_issuer.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "register_credential".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_credential.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "register_holder".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_holder.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "register_sub_issuer".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_sub_issuer.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "claim_credential_proof".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/holder/claim_credential_proof.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "sign_credential".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/owner/sign_credential.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "verify_digest".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/verifier/verify_digest.move".to_string(),
+            compiled_path: "".to_string(),
+        },
     ];
 
     for script in &mut scripts {
         println!("Compiling : {}", script.path);
-        let compiled_path = dev.compile_modules(script.path.clone(), global_deps.clone()).expect("Failed to compile");
+        let compiled_path = dev.compile_source(script.path.clone(), global_deps.clone()).expect("Failed to compile");
         script.setCopiledPath(compiled_path);
         println!("compiled path : {}", script.compiled_path);
     };
