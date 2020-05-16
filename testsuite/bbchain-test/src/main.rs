@@ -124,6 +124,11 @@ fn compile_scripts(dev: &mut DevProxy) -> Result<Vec<BBChainScript>> {
             path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/init_root_issuer.move".to_string(),
             compiled_path: "".to_string(),
         },
+        BBChainScript{
+            desc: "register_sub_issuer".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_sub_issuer.move".to_string(),
+            compiled_path: "".to_string(),
+        },
         // BBChainScript{
         //     desc: "aggregate_credenail_proof".to_string(),
         //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/aggregate_credenail_proof.move".to_string(),
@@ -142,11 +147,6 @@ fn compile_scripts(dev: &mut DevProxy) -> Result<Vec<BBChainScript>> {
         // BBChainScript{
         //     desc: "register_holder".to_string(),
         //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_holder.move".to_string(),
-        //     compiled_path: "".to_string(),
-        // },
-        // BBChainScript{
-        //     desc: "register_sub_issuer".to_string(),
-        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_sub_issuer.move".to_string(),
         //     compiled_path: "".to_string(),
         // },
         // BBChainScript{

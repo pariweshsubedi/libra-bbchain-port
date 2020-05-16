@@ -64,7 +64,7 @@ const NUM_ORG: usize = 1;
 const NUM_FACULTIES: usize = 2;
 const NUM_COURSES: usize = 1;
 const NUM_COURSE_WORKS: usize = 4;
-const NUM_OWNERS_PER_COURSE: usize = 3;
+const NUM_OWNERS_PER_COURSE: usize = 2;
 const NUM_STUDENTS_PER_COURSE: usize = 1;
 const TOTAL_ACCOUNTS: usize = NUM_ORG * NUM_FACULTIES * NUM_COURSES * NUM_COURSE_WORKS;
 
@@ -190,7 +190,7 @@ impl TxEmitter {
         println!("Owners per org : {}", account_per_org);
         println!("Holder account per org : {}", holder_account);
        
-        let accounts_per_client = 10;//TOTAL_ACCOUNTS/instances.len();
+        let accounts_per_client = 30;
         let num_clients = 1;
         let num_accounts = accounts_per_client * num_clients;
         
@@ -490,22 +490,58 @@ impl SubmissionWorker {
     fn build_requests(&mut self) -> Vec<SignedTransaction>{
         let mut requests = Vec::new();
 
+        // gen requests to create organization structure
         for org_index in 0..NUM_ORG {
-            let request = self.build_issuer_request().expect("Error building root issuer");
+            println!("Remaining accounts : {}", self.accounts.len());
+            let (org_account, request) = self.build_issuer_request();
             requests.push(request);
+            
+            // build faculty
+            for faculty_index in 0..NUM_FACULTIES{
+                println!("Remaining accounts : {}", self.accounts.len());
+                let (fac_account, request) = self.build_sub_issuer_request(&org_account);
+                requests.push(request);
+            }
         }
     
         requests
     }
+
+    fn build_sub_issuer_request(&mut self, parent_issuer: &AccountData) -> (AccountData,SignedTransaction) {
+        let mut account = match self.accounts.pop() {
+                Some(account) => account,
+                None => panic!("failed to get org account"),
+            };
+        
+        let owners = self.accounts.split_off(self.accounts.len() - NUM_OWNERS_PER_COURSE);
+        println!("owners total {}",owners.len());
+        
+        //script handles 2 owners, can be extended but good enough for testing
+        let mut arguments = vec![
+            parent_issuer.address.to_string(),
+            owners[0].address.to_string(),
+            owners[1].address.to_string(),
+            NUM_OWNERS_PER_COURSE.to_string()
+        ];
+
+        let script_compiled_path = self.get_bbchain_compiled_script_path("register_sub_issuer", &self.compiled_scripts);
+        let request = gen_bbchain_txn_request(&*self.compiled_scripts[script_compiled_path].compiled_path, 
+            &mut account, 
+            arguments
+        );
+
+        (account, request)
+    }
     
     
-    fn build_issuer_request(&mut self) -> Result<SignedTransaction> {
+    fn build_issuer_request(&mut self, ) -> (AccountData,SignedTransaction) {
         let mut org_account = match self.accounts.pop() {
                 Some(account) => account,
                 None => panic!("failed to get org account"),
             };
         
-        let owners = self.accounts.split_off(NUM_OWNERS_PER_COURSE);
+        let owners = self.accounts.split_off(self.accounts.len() - NUM_OWNERS_PER_COURSE);
+        println!("owners total {}",owners.len());
 
         let mut arguments: Vec<_> = owners
         .iter()
@@ -513,20 +549,21 @@ impl SubmissionWorker {
         .collect();
         arguments.push(NUM_OWNERS_PER_COURSE.to_string());
 
-        let script_compiled_path = self.get_bbchain_compiled_script_path("init_root_issuer", self.compiled_scripts.clone());
+        let script_compiled_path = self.get_bbchain_compiled_script_path("init_root_issuer", &self.compiled_scripts);
         let request = gen_bbchain_txn_request(&*self.compiled_scripts[script_compiled_path].compiled_path, 
             &mut org_account, 
             arguments
         );
 
-        Ok(request)
+        (org_account, request)
     }
+    
 
     fn gen_requests(&mut self) -> Vec<SignedTransaction> {
         let mut rng = ThreadRng::default();
         let batch_size = max(MAX_TXN_BATCH_SIZE, self.accounts.len());
         println!("Set batch size");
-        let script_compiled_path = self.get_bbchain_compiled_script_path("init_root_issuer", self.compiled_scripts.clone());
+        let script_compiled_path = self.get_bbchain_compiled_script_path("init_root_issuer", &self.compiled_scripts);
         println!("compiled script path : {}", script_compiled_path);
         let accounts = self
             .accounts
@@ -557,16 +594,15 @@ impl SubmissionWorker {
         requests
     }
 
-    fn get_bbchain_compiled_script_path(&self, script_desc: &str, compiled_scripts: Vec<BBChainScript>) -> usize {
+    fn get_bbchain_compiled_script_path(&self, script_desc: &str, compiled_scripts: &Vec<BBChainScript>) -> usize {
         let mut i:usize = 0;
         for script in compiled_scripts {
             if(&script.desc == script_desc){
+                println!("Compiled script len : {}",compiled_scripts.len());
+                println!("Found script for {}",script_desc);
                 return i;
-                // return &*script.compiled_path
             }
             i= i+1;
-            // let arguments = vec![];
-            // dev.execute_script(&*script.compiled_path, &arguments);
         }
         panic!("BBchain script not found");
     }
