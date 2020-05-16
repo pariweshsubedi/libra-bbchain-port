@@ -216,33 +216,36 @@ impl TxEmitter {
         let workers_per_ac = 1;
 
         println!("All addresses: {:?}", all_addresses);
-        for instance in &instances {
-            for _ in 0..workers_per_ac {
-                let client = self.make_client(&instance);
-                let accounts = (&mut all_accounts).take(accounts_per_client).collect();
-                let all_addresses = all_addresses.clone();
-                let stop = stop.clone();
-                // let params = req.thread_params.clone();
-                let params = EmitThreadParams::default();
-                let stats = Arc::clone(&stats);
-                let compiled_scripts = self.compiled_scripts.clone();
-                let worker = SubmissionWorker {
-                    accounts,
-                    client,
-                    all_addresses,
-                    stop,
-                    params,
-                    stats,
-                    compiled_scripts
-                };
 
-                println!("worker created");
-                let join_handle = tokio_handle.spawn(worker.run().boxed());
-                println!("join handle ran");
-                workers.push(Worker { join_handle });
-                println!("pushed worker");
-            }
-        }
+        
+        // for instance in &instances {
+        //     println!("Instance loop");
+        //     for _ in 0..workers_per_ac {
+        //         println!("worker loop");
+        //         let client = self.make_client(&instance);
+        //         let accounts = (&mut all_accounts).take(accounts_per_client).collect();
+        //         let all_addresses = all_addresses.clone();
+        //         let stop = stop.clone();
+        //         let params = EmitThreadParams::default();
+        //         let stats = Arc::clone(&stats);
+        //         let compiled_scripts = self.compiled_scripts.clone();
+        //         let worker = SubmissionWorker {
+        //             accounts,
+        //             client,
+        //             all_addresses,
+        //             stop,
+        //             params,
+        //             stats,
+        //             compiled_scripts
+        //         };
+
+        //         println!("worker created");
+        //         let join_handle = tokio_handle.spawn(worker.run().boxed());
+        //         println!("join handle ran");
+        //         workers.push(Worker { join_handle });
+        //         println!("pushed worker");
+        //     }
+        // }
         Ok(EmitJob {
             workers,
             stop,
@@ -473,44 +476,46 @@ struct BBChainResponse{
 impl SubmissionWorker {
     #[allow(clippy::collapsible_if)]
     async fn run(mut self) -> Vec<AccountData> {
+
+        println!("Worker started");
         let wait = Duration::from_millis(self.params.wait_millis);
         while !self.stop.load(Ordering::Relaxed) {
-            // println!("Generating requests ....");
-            // let requests = self.gen_requests();
-            // println!("Generated requests");
-            // let num_requests = requests.len();
-            // for request in requests {
-            //     self.stats.submitted.fetch_add(1, Ordering::Relaxed);
-            //     let wait_util = Instant::now() + wait;
-            //     let resp = self.client.submit_transaction(request).await;
-            //     if let Err(e) = resp {
-            //         warn!("[{:?}] Failed to submit request: {:?}", self.client, e);
-            //     }
-            //     let now = Instant::now();
-            //     if wait_util > now {
-            //         time::delay_for(wait_util - now).await;
-            //     }
-            // }
-            // if self.params.wait_committed {
-            //     if let Err(uncommitted) =
-            //         wait_for_accounts_sequence(&self.client, &mut self.accounts).await
-            //     {
-            //         self.stats
-            //             .committed
-            //             .fetch_add((num_requests - uncommitted.len()) as u64, Ordering::Relaxed);
-            //         self.stats
-            //             .expired
-            //             .fetch_add(uncommitted.len() as u64, Ordering::Relaxed);
-            //         info!(
-            //             "[{:?}] Transactions were not committed before expiration: {:?}",
-            //             self.client, uncommitted
-            //         );
-            //     } else {
-            //         self.stats
-            //             .committed
-            //             .fetch_add(num_requests as u64, Ordering::Relaxed);
-            //     }
-            // }
+            println!("Generating requests ....");
+            let requests = self.gen_requests();
+            println!("Generated requests");
+            let num_requests = requests.len();
+            for request in requests {
+                self.stats.submitted.fetch_add(1, Ordering::Relaxed);
+                let wait_util = Instant::now() + wait;
+                let resp = self.client.submit_transaction(request).await;
+                if let Err(e) = resp {
+                    warn!("[{:?}] Failed to submit request: {:?}", self.client, e);
+                }
+                let now = Instant::now();
+                if wait_util > now {
+                    time::delay_for(wait_util - now).await;
+                }
+            }
+            if self.params.wait_committed {
+                if let Err(uncommitted) =
+                    wait_for_accounts_sequence(&self.client, &mut self.accounts).await
+                {
+                    self.stats
+                        .committed
+                        .fetch_add((num_requests - uncommitted.len()) as u64, Ordering::Relaxed);
+                    self.stats
+                        .expired
+                        .fetch_add(uncommitted.len() as u64, Ordering::Relaxed);
+                    info!(
+                        "[{:?}] Transactions were not committed before expiration: {:?}",
+                        self.client, uncommitted
+                    );
+                } else {
+                    self.stats
+                        .committed
+                        .fetch_add(num_requests as u64, Ordering::Relaxed);
+                }
+            }
         }
         self.accounts
     }
@@ -518,15 +523,20 @@ impl SubmissionWorker {
     fn gen_requests(&mut self) -> Vec<SignedTransaction> {
         let mut rng = ThreadRng::default();
         let batch_size = max(MAX_TXN_BATCH_SIZE, self.accounts.len());
+        println!("Set batch size");
         let script_compiled_path = self.get_bbchain_compiled_script_path("init_root_issuer", self.compiled_scripts.clone());
+        println!("compiled script path : {}", script_compiled_path);
         let accounts = self
             .accounts
             .iter_mut()
             .choose_multiple(&mut rng, batch_size);
         let mut requests = Vec::with_capacity(accounts.len());
         for sender in accounts {
+            println!("Starting account call");
             let owner1 = self.all_addresses.choose(&mut rng).expect("all_addresses can't be empty");
             let owner2 = self.all_addresses.choose(&mut rng).expect("all_addresses can't be empty");
+
+            println!("Owners selected");
             
             // let request = gen_transfer_txn_request(sender, receiver, Vec::new(), 1);
             let request = gen_bbchain_txn_request(&*self.compiled_scripts[script_compiled_path].compiled_path, 
@@ -537,6 +547,9 @@ impl SubmissionWorker {
                     "2".to_string()
                 ]
             );
+
+            println!("Request generated");
+
             requests.push(request);
         }
         requests
@@ -545,11 +558,11 @@ impl SubmissionWorker {
     fn get_bbchain_compiled_script_path(&self, script_desc: &str, compiled_scripts: Vec<BBChainScript>) -> usize {
         let mut i:usize = 0;
         for script in compiled_scripts {
-            i= i+1;
             if(&script.desc == script_desc){
                 return i;
                 // return &*script.compiled_path
             }
+            i= i+1;
             // let arguments = vec![];
             // dev.execute_script(&*script.compiled_path, &arguments);
         }

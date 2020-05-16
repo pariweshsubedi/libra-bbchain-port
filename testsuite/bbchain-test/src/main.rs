@@ -3,6 +3,7 @@ use std::{
     process::{Command, Stdio, Child},
     path::Path,
     time::{Duration, UNIX_EPOCH},
+    sync::atomic::Ordering,
 };
 use libra_logger::{info, warn};
 use structopt::{clap::ArgGroup, StructOpt};
@@ -204,14 +205,20 @@ impl ClusterTestRunner {
     pub async fn start_job(&self, compiled_scripts: Vec<BBChainScript>){
         println!("Starting job");
         // self.tx_emitter.start_job(self.instances);
-        let time = Duration::from_secs(1);
+        let time = Duration::from_secs(10);
         let mut emitter = TxEmitter::new(compiled_scripts);
         let job = emitter
             .start_job(setup_instances())
             .await
             .expect("Failed to start emit job");
         thread::sleep(time);
-        // emitter.stop_job(job);
+        let stats = emitter.stop_job(job);
+
+        println!("Submitted : {}", stats.submitted.load(Ordering::Relaxed));
+        println!("Committed : {}", stats.committed.load(Ordering::Relaxed));
+        println!("Expired : {}", stats.expired.load(Ordering::Relaxed));
+        
+        // Ok(stats)
         println!("Completed job");
     }
 }
