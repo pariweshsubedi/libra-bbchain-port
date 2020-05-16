@@ -178,22 +178,18 @@ impl TxEmitter {
     }
 
     pub async fn start_job(&mut self, instances: Vec<Instance>) -> Result<EmitJob> {
-        // let workers_per_ac = match req.workers_per_ac {
-        //     Some(x) => x,
-        //     None => {
-        //         let target_threads = 300;
-        //         // Trying to create somewhere between target_threads/2..target_threads threads
-        //         // We want to have equal numbers of threads for each AC, so that they are equally loaded
-        //         // Otherwise things like flamegrap/perf going to show different numbers depending on which AC is chosen
-        //         // Also limiting number of threads as max 10 per AC for use cases with very small number of nodes or use --peers
-        //         min(10, max(1, target_threads / req.instances.len()))
-        //     }
-        // };
-        // let num_clients = req.instances.len() * workers_per_ac;
-        // info!(
-        //     "Will use {} workers per AC with total {} AC clients",
-        //     workers_per_ac, num_clients
-        // );
+
+
+        let account_per_org = (NUM_FACULTIES * NUM_COURSES) + 1; // including organization
+        let owner_accounts = NUM_OWNERS_PER_COURSE * NUM_COURSES;
+        let holder_account = (NUM_COURSES * NUM_STUDENTS_PER_COURSE);
+
+        let total_account_per_org = account_per_org + owner_accounts + holder_account;
+    
+        println!("Accounts per org : {}", account_per_org);
+        println!("Owners per org : {}", account_per_org);
+        println!("Holder account per org : {}", holder_account);
+       
         let accounts_per_client = 10;//TOTAL_ACCOUNTS/instances.len();
         let num_clients = 1;
         let num_accounts = accounts_per_client * num_clients;
@@ -217,35 +213,38 @@ impl TxEmitter {
 
         println!("All addresses: {:?}", all_addresses);
 
-        
-        // for instance in &instances {
-        //     println!("Instance loop");
-        //     for _ in 0..workers_per_ac {
-        //         println!("worker loop");
-        //         let client = self.make_client(&instance);
-        //         let accounts = (&mut all_accounts).take(accounts_per_client).collect();
-        //         let all_addresses = all_addresses.clone();
-        //         let stop = stop.clone();
-        //         let params = EmitThreadParams::default();
-        //         let stats = Arc::clone(&stats);
-        //         let compiled_scripts = self.compiled_scripts.clone();
-        //         let worker = SubmissionWorker {
-        //             accounts,
-        //             client,
-        //             all_addresses,
-        //             stop,
-        //             params,
-        //             stats,
-        //             compiled_scripts
-        //         };
+        // build organization structure
+        // let test_organization_structure = init_org(all_accounts);
 
-        //         println!("worker created");
-        //         let join_handle = tokio_handle.spawn(worker.run().boxed());
-        //         println!("join handle ran");
-        //         workers.push(Worker { join_handle });
-        //         println!("pushed worker");
-        //     }
-        // }
+        
+        for instance in &instances {
+            println!("Instance loop");
+            for _ in 0..workers_per_ac {
+                println!("worker loop");
+                let client = self.make_client(&instance);
+                let accounts = (&mut all_accounts).take(accounts_per_client).collect();
+                let all_addresses = all_addresses.clone();
+                let stop = stop.clone();
+                let params = EmitThreadParams::default();
+                let stats = Arc::clone(&stats);
+                let compiled_scripts = self.compiled_scripts.clone();
+                let worker = SubmissionWorker {
+                    accounts,
+                    client,
+                    all_addresses,
+                    stop,
+                    params,
+                    stats,
+                    compiled_scripts
+                };
+
+                println!("worker created");
+                let join_handle = tokio_handle.spawn(worker.run().boxed());
+                println!("join handle ran");
+                workers.push(Worker { join_handle });
+                println!("pushed worker");
+            }
+        }
         Ok(EmitJob {
             workers,
             stop,
@@ -415,6 +414,7 @@ struct BBChainIssuerEntity{
     account: AccountData,
     sub_issuers: Vec<BBChainIssuerEntity>,
     holders: Vec<AccountData>,
+    owners: Vec<AccountData>,
     digests: Vec<Vec<u8>>,
 }
 
@@ -429,59 +429,25 @@ struct BBChainResponse{
 }
 
 
-// // const NUM_ORG: usize = 1;
-// // const NUM_FACULTIES: usize = 2;
-// // const NUM_COURSES: usize = 1;
-// // const NUM_COURSE_WORKS: usize = 4;
-// // const NUM_OWNERS_PER_COURSE: usize = 3;
-// // const NUM_STUDENTS_PER_COURSE: usize = 1;
-// // const TOTAL_ACCOUNTS: usize = NUM_ORG * NUM_FACULTIES * NUM_COURSES * NUM_COURSE_WORKS;
+// const NUM_ORG: usize = 1;
+// const NUM_FACULTIES: usize = 2;
+// const NUM_COURSES: usize = 1;
+// const NUM_OWNERS_PER_COURSE: usize = 3;
+// const NUM_STUDENTS_PER_COURSE: usize = 1;
+// const TOTAL_ACCOUNTS: usize = NUM_ORG * NUM_FACULTIES * NUM_COURSES * NUM_COURSE_WORKS;
 
 // // Creates organization structure on chain
 // //
-// fn init_org(libra_accounts: Vec<AccountData>) -> Result<BBChainResponse>{
-//     let organizations = vec![];
-//     for org_index in 1..NUM_ORG {
-//         //register root issuer
-//         let digests = vec![""];
-
-//         for faculty_index in 1..NUM_FACULTIES {
-//             //register sub issuer
-//             for course_index in 1..NUM_COURSES {
-//                 //register sub issuer with NUM_OWNERS_PER_COURSE
-
-//                 for student_index in 1..NUM_STUDENTS_PER_COURSE{
-//                     //register student to all issuers
-                    
-//                     //register student credential
-
-//                 }
-
-//                 // owner signs the credentials
-
-
-//                 // student claims the credential
-//             }
-//         }
-        
-//     }
-
-//     Ok(BBChainResponse{
-//         organizations: organizations
-//     })
-// }
-
-
 
 impl SubmissionWorker {
     #[allow(clippy::collapsible_if)]
     async fn run(mut self) -> Vec<AccountData> {
-
         println!("Worker started");
         let wait = Duration::from_millis(self.params.wait_millis);
-        while !self.stop.load(Ordering::Relaxed) {
+        // while !self.stop.load(Ordering::Relaxed) {
             println!("Generating requests ....");
-            let requests = self.gen_requests();
+            // let requests = self.gen_requests();
+            let requests = self.build_requests();
             println!("Generated requests");
             let num_requests = requests.len();
             for request in requests {
@@ -516,8 +482,44 @@ impl SubmissionWorker {
                         .fetch_add(num_requests as u64, Ordering::Relaxed);
                 }
             }
-        }
+        // }
         self.accounts
+    }
+
+    // builds ordered vector or requests to simulate bbchain workflow
+    fn build_requests(&mut self) -> Vec<SignedTransaction>{
+        let mut requests = Vec::new();
+
+        for org_index in 0..NUM_ORG {
+            let request = self.build_issuer_request().expect("Error building root issuer");
+            requests.push(request);
+        }
+    
+        requests
+    }
+    
+    
+    fn build_issuer_request(&mut self) -> Result<SignedTransaction> {
+        let mut org_account = match self.accounts.pop() {
+                Some(account) => account,
+                None => panic!("failed to get org account"),
+            };
+        
+        let owners = self.accounts.split_off(NUM_OWNERS_PER_COURSE);
+
+        let mut arguments: Vec<_> = owners
+        .iter()
+        .map(|owner| owner.address.to_string())
+        .collect();
+        arguments.push(NUM_OWNERS_PER_COURSE.to_string());
+
+        let script_compiled_path = self.get_bbchain_compiled_script_path("init_root_issuer", self.compiled_scripts.clone());
+        let request = gen_bbchain_txn_request(&*self.compiled_scripts[script_compiled_path].compiled_path, 
+            &mut org_account, 
+            arguments
+        );
+
+        Ok(request)
     }
 
     fn gen_requests(&mut self) -> Vec<SignedTransaction> {

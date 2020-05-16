@@ -205,7 +205,7 @@ impl ClusterTestRunner {
     pub async fn start_job(&self, compiled_scripts: Vec<BBChainScript>){
         println!("Starting job");
         // self.tx_emitter.start_job(self.instances);
-        let time = Duration::from_secs(10);
+        let time = Duration::from_secs(5);
         let mut emitter = TxEmitter::new(compiled_scripts);
         let job = emitter
             .start_job(setup_instances())
