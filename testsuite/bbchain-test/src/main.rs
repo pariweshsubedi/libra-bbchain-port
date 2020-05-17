@@ -129,41 +129,41 @@ fn compile_scripts(dev: &mut DevProxy) -> Result<Vec<BBChainScript>> {
             path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_sub_issuer.move".to_string(),
             compiled_path: "".to_string(),
         },
-        // BBChainScript{
-        //     desc: "aggregate_credenail_proof".to_string(),
-        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/aggregate_credenail_proof.move".to_string(),
-        //     compiled_path: "".to_string(),
-        // },
-        // BBChainScript{
-        //     desc: "init_holder".to_string(),
-        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/init_holder.move".to_string(),
-        //     compiled_path: "".to_string(),
-        // },
-        // BBChainScript{
-        //     desc: "register_credential".to_string(),
-        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_credential.move".to_string(),
-        //     compiled_path: "".to_string(),
-        // },
-        // BBChainScript{
-        //     desc: "register_holder".to_string(),
-        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_holder.move".to_string(),
-        //     compiled_path: "".to_string(),
-        // },
-        // BBChainScript{
-        //     desc: "claim_credential_proof".to_string(),
-        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/holder/claim_credential_proof.move".to_string(),
-        //     compiled_path: "".to_string(),
-        // },
-        // BBChainScript{
-        //     desc: "sign_credential".to_string(),
-        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/owner/sign_credential.move".to_string(),
-        //     compiled_path: "".to_string(),
-        // },
-        // BBChainScript{
-        //     desc: "verify_digest".to_string(),
-        //     path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/verifier/verify_digest.move".to_string(),
-        //     compiled_path: "".to_string(),
-        // },
+        BBChainScript{ // creates credential account for student
+            desc: "init_holder".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/init_holder.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "register_holder".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_holder.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "register_credential".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/register_credential.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "sign_credential".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/owner/sign_credential.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "claim_credential_proof".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/holder/claim_credential_proof.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "aggregate_credential_proof".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/issuer/aggregate_credential_proof.move".to_string(),
+            compiled_path: "".to_string(),
+        },
+        BBChainScript{
+            desc: "verify_digest".to_string(),
+            path: "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/scripts/verifier/verify_digest.move".to_string(),
+            compiled_path: "".to_string(),
+        },
     ];
 
     for script in &mut scripts {

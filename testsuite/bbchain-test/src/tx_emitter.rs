@@ -490,23 +490,81 @@ impl SubmissionWorker {
     fn build_requests(&mut self) -> Vec<SignedTransaction>{
         let mut requests = Vec::new();
 
+        let mut digests:Vec<String> = Vec::new();
+
+        // as a verifier I would want to verify digests
+        let mut verifier_account = match self.accounts.pop() {
+            Some(account) => account,
+            None => panic!("failed to get verifier account"),
+        };
+
         // gen requests to create organization structure
         for org_index in 0..NUM_ORG {
             println!("Remaining accounts : {}", self.accounts.len());
-            let (org_account, request) = self.build_issuer_request();
+            let (mut org_account, request) = self.build_issuer_request();
             requests.push(request);
             
             // build faculty
             for faculty_index in 0..NUM_FACULTIES{
                 println!("Remaining accounts : {}", self.accounts.len());
-                let (fac_account, request) = self.build_sub_issuer_request(&org_account);
+                let (fac_account, fac_owners_account, request) = self.build_sub_issuer_request(&org_account);
                 requests.push(request);
 
                 // build course
-                for faculty_index in 0..NUM_COURSES{
+                for course_index in 0..NUM_COURSES{
                     println!("Remaining accounts : {}", self.accounts.len());
-                    let (course_account, request) = self.build_sub_issuer_request(&fac_account);
+                    let (mut course_account, mut course_owners_accounts, request) = self.build_sub_issuer_request(&fac_account);
                     requests.push(request);
+
+                    let mut course_digests:Vec<String> = Vec::new();
+
+                    // register student to org/course
+                    for student_index in 0..NUM_STUDENTS_PER_COURSE{
+                        println!("Remaining accounts : {}", self.accounts.len());
+                        // create CA
+                        let (mut std_account, request) = self.build_holder_init_request(&org_account);
+                        requests.push(request);
+
+                        let request = self.build_holder_registration_request(&mut course_account, &std_account);
+                        requests.push(request);
+
+                        // register credential for student
+                        for credential_index in 0..NUM_COURSE_WORKS{
+                            let digest = self.generate_credential();
+
+                            let request = self.build_holder_digest_registration_request(&mut course_account, &std_account, digest.clone());
+                            requests.push(request);
+                            
+                            // println!("Digest Created : {}", digest);
+                            course_digests.push(digest);
+                        }
+
+                        // sign the registered credential as course owners
+                        for owmer_index in 0..NUM_OWNERS_PER_COURSE{
+                            for sign_cred_index in 0..course_digests.len(){
+                                let request = self.build_sign_credential_request(&mut course_account, &mut course_owners_accounts[owmer_index] ,course_digests[sign_cred_index].clone());
+                                requests.push(request);
+                            }
+                        }
+
+                        // student claims the credential proof()
+                        let request = self.build_claim_credential_proof_request(&mut course_account, &mut std_account);
+                        requests.push(request);
+
+                        // as a root issuer student credentials are all aggregated to provide final aggregation
+                        let request = self.build_aggregate_credential_proof_request(&mut org_account, &mut std_account);
+                        requests.push(request);
+
+
+                        // verifier verifies digest
+                        for digest_index in 0..course_digests.len(){
+                            let request = self.build_verify_digest_request(&mut verifier_account, &mut course_account, &mut std_account, course_digests[digest_index].clone());
+                            requests.push(request);
+                        }
+
+                        // TODO : merge course digests with digests
+                        digests.extend_from_slice(&course_digests);
+                    }
                 }
             }
         }
@@ -514,7 +572,122 @@ impl SubmissionWorker {
         requests
     }
 
-    fn build_sub_issuer_request(&mut self, parent_issuer: &AccountData) -> (AccountData,SignedTransaction) {
+    fn build_verify_digest_request(&mut self,mut verifier_account: &mut AccountData, mut course_account: &mut AccountData, mut std_account: &mut AccountData, digest: String) -> SignedTransaction {    
+        let mut arguments = vec![
+            digest,
+            course_account.address.to_string(),
+            std_account.address.to_string(),
+        ];
+
+        let script_compiled_path = self.get_bbchain_compiled_script_path("verify_digest", &self.compiled_scripts);
+        let request = gen_bbchain_txn_request(&*self.compiled_scripts[script_compiled_path].compiled_path, 
+            &mut verifier_account, 
+            arguments
+        );
+
+        request
+    }
+    
+
+    fn build_aggregate_credential_proof_request(&mut self,mut org_account: &mut AccountData, mut std_account: &mut AccountData ) -> SignedTransaction {    
+        let mut arguments = vec![
+            std_account.address.to_string(),
+        ];
+
+        let script_compiled_path = self.get_bbchain_compiled_script_path("aggregate_credential_proof", &self.compiled_scripts);
+        let request = gen_bbchain_txn_request(&*self.compiled_scripts[script_compiled_path].compiled_path, 
+            &mut org_account, 
+            arguments
+        );
+
+        request
+    }
+
+    fn build_claim_credential_proof_request(&mut self,mut course_account: &mut AccountData, mut std_account: &mut AccountData ) -> SignedTransaction {    
+        let mut arguments = vec![
+            course_account.address.to_string(),
+        ];
+
+        let script_compiled_path = self.get_bbchain_compiled_script_path("claim_credential_proof", &self.compiled_scripts);
+        let request = gen_bbchain_txn_request(&*self.compiled_scripts[script_compiled_path].compiled_path, 
+            &mut std_account, 
+            arguments
+        );
+
+        request
+    }
+
+    fn build_sign_credential_request(&mut self,mut course_account: &mut AccountData, mut owner_account: &mut AccountData, digest: String ) -> SignedTransaction {    
+        let mut arguments = vec![
+            course_account.address.to_string(),
+            digest,
+        ];
+
+        let script_compiled_path = self.get_bbchain_compiled_script_path("sign_credential", &self.compiled_scripts);
+        let request = gen_bbchain_txn_request(&*self.compiled_scripts[script_compiled_path].compiled_path, 
+            &mut owner_account, 
+            arguments
+        );
+
+        request
+    }
+
+    fn build_holder_digest_registration_request(&mut self,mut course_account: &mut AccountData, std_account: &AccountData, digest: String ) -> SignedTransaction {    
+        let mut arguments = vec![
+            std_account.address.to_string(),
+            digest,
+        ];
+
+        let script_compiled_path = self.get_bbchain_compiled_script_path("register_credential", &self.compiled_scripts);
+        let request = gen_bbchain_txn_request(&*self.compiled_scripts[script_compiled_path].compiled_path, 
+            &mut course_account, 
+            arguments
+        );
+
+        request
+    }
+
+    fn generate_credential(&mut self) -> String{
+        // let random_bytes: Vec<u8> = (0..255).map(|_| { rand::random::<u8>() }).collect();
+        let byte_string = "b\"credential\"".to_string();
+        // let byte_string = random_bytes.iter().map(|&c| c as char).collect::<String>();
+        byte_string
+    }
+
+    fn build_holder_registration_request(&mut self,mut course_account: &mut AccountData, std_account: &AccountData ) -> SignedTransaction {    
+        let mut arguments = vec![
+            std_account.address.to_string(),
+        ];
+
+        let script_compiled_path = self.get_bbchain_compiled_script_path("register_holder", &self.compiled_scripts);
+        let request = gen_bbchain_txn_request(&*self.compiled_scripts[script_compiled_path].compiled_path, 
+            &mut course_account, 
+            arguments
+        );
+
+        request
+    }
+
+    fn build_holder_init_request(&mut self, root_issuer: &AccountData) -> (AccountData,SignedTransaction) {
+        let mut account = match self.accounts.pop() {
+                Some(account) => account,
+                None => panic!("failed to get org account"),
+            };
+        
+        let mut arguments = vec![
+            root_issuer.address.to_string(),
+        ];
+
+        let script_compiled_path = self.get_bbchain_compiled_script_path("init_holder", &self.compiled_scripts);
+        let request = gen_bbchain_txn_request(&*self.compiled_scripts[script_compiled_path].compiled_path, 
+            &mut account, 
+            arguments
+        );
+
+        (account, request)
+    }
+
+    fn build_sub_issuer_request(&mut self, parent_issuer: &AccountData) -> (AccountData, Vec<AccountData>, SignedTransaction) {
         let mut account = match self.accounts.pop() {
                 Some(account) => account,
                 None => panic!("failed to get org account"),
@@ -537,7 +710,7 @@ impl SubmissionWorker {
             arguments
         );
 
-        (account, request)
+        (account, owners, request)
     }
     
     
@@ -605,7 +778,6 @@ impl SubmissionWorker {
         let mut i:usize = 0;
         for script in compiled_scripts {
             if(&script.desc == script_desc){
-                println!("Compiled script len : {}",compiled_scripts.len());
                 println!("Found script for {}",script_desc);
                 return i;
             }
