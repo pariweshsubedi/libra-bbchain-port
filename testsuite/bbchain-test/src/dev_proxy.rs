@@ -7,7 +7,7 @@ use cli::{
 };
 use crate::libra_client::LibraClient;
 use crate::tx_emitter::AccountData;
-use anyhow::{bail, ensure, format_err, Error, Result};
+use anyhow::{ensure, format_err, Error, Result};
 use libra_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     test_utils::KeyPair,
@@ -15,7 +15,7 @@ use libra_crypto::{
     x25519, ValidCryptoMaterialStringExt,
 };
 use libra_json_rpc_client::views::{AccountView, BlockMetadata, EventView, TransactionView};
-use libra_logger::prelude::*;
+
 use libra_temppath::TempPath;
 use libra_types::{
     access_path::AccessPath,
@@ -37,16 +37,15 @@ use libra_wallet::{io_utils, WalletLibrary};
 use reqwest::Url;
 use std::{
     collections::HashMap,
-    convert::TryFrom,
-    fmt, fs,
+    convert::TryFrom, fs,
     io::{stdout, Write},
     path::{Path, PathBuf},
     process::Command,
     str::{self, FromStr},
     thread, time,
 };
-use stdlib::transaction_scripts::StdlibScript;
-use transaction_builder::encode_register_validator_script;
+
+
 
 /// Enum used for error formatting.
 #[derive(Debug)]
@@ -575,7 +574,7 @@ impl DevProxy {
     // }
 
     /// Compile Move program
-    pub fn compile_program(&mut self, is_module: bool, source_file_path: String, deps: Vec<String>) -> Result<String> {
+    pub fn compile_program(&mut self, _is_module: bool, source_file_path: String, deps: Vec<String>) -> Result<String> {
         // ensure!(
         //     space_delim_strings[0] == "compile",
         //     "inconsistent command '{}' for compile_program",

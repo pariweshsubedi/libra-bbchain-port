@@ -1,14 +1,12 @@
 use std::{
     env, thread,
-    process::{Command, Stdio, Child},
-    path::Path,
     time::{Duration, UNIX_EPOCH},
     sync::atomic::Ordering,
 };
-use libra_logger::{info, warn};
+
 use structopt::{clap::ArgGroup, StructOpt};
 use libra_temppath::TempPath;
-use anyhow::{bail, ensure, format_err, Error, Result};
+use anyhow::{Result};
 pub mod client;
 pub mod dev_proxy;
 pub mod instance;
@@ -16,17 +14,16 @@ pub mod libra_client;
 pub mod tx_emitter;
 
 use dev_proxy::{DevProxy};
-use tx_emitter::{TxEmitter, AccountData, BBChainScript};
+use tx_emitter::{TxEmitter, BBChainScript};
 use instance::{Instance};
 use tokio::{
     runtime::{Builder, Runtime},
-    time::{delay_for, delay_until, Instant as TokioInstant},
 };
 use libra_types::{
     waypoint::Waypoint,
 };
 use chrono::{DateTime, Utc};
-use dialoguer::{Confirm, Input};
+use dialoguer::{Confirm};
 
 
 #[derive(StructOpt, Debug)]
@@ -41,43 +38,6 @@ struct BBChainModules{
     pub deps: Vec<String>,
 }
 
-fn build_bbchain_modules(mut dev: &mut DevProxy){
-    println!("\nBuilding Modules ============================\n");
-    let modules = vec![
-        BBChainModules{
-            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-            deps : vec![
-                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
-            ] 
-        },
-        BBChainModules{
-            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
-            deps : vec![
-                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
-            ] 
-        },
-        BBChainModules{
-            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
-            deps : vec![
-                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
-            ]
-        },      
-    ];
-
-    // deploy modules
-    for f in &modules {
-        println!("\nCompiling : {}", f.path);
-        let compiled_path = dev.compile_source(f.path.clone(), f.deps.clone()).expect("Failed to compile");
-        println!("\nPublishing Now...");
-        dev.publish_module(&compiled_path).expect("Error publishing module");
-        println!("\n!! Published {} !!", f.path);
-    }
-    println!("\nCompleted Building Modules ============================ \n");
-}
-
 pub fn main() {
     setup_log();
     
@@ -90,7 +50,7 @@ pub fn main() {
     // Initialize
     let mut txemitter = TxEmitter::new(vec![]);
     let instances = setup_instances();
-    let mut bbchain_account = rt.block_on(txemitter.get_bbchain_account(instances)).expect("Failed loading bbchain account");
+    let bbchain_account = rt.block_on(txemitter.get_bbchain_account(instances)).expect("Failed loading bbchain account");
     println!("BBchain address : {}", bbchain_account.address);
 
     let mut dev = DevProxy::create(bbchain_account, waypoint).expect("Failed to construct dev proxy.");
@@ -102,9 +62,9 @@ pub fn main() {
 
     // compile scripts and run test
     if Confirm::new().with_prompt("\n\nCompile scripts and run test transaction ?").interact().unwrap(){
-        let mut compiled_scripts = compile_scripts(&mut dev).expect("failed to compile scripts");
+        let compiled_scripts = compile_scripts(&mut dev).expect("failed to compile scripts");
 
-        let mut runner = ClusterTestRunner::setup(&args,vec![]);
+        let runner = ClusterTestRunner::setup(&args,vec![]);
         rt.block_on(runner.start_job(compiled_scripts.clone()));
     } 
     
@@ -179,6 +139,43 @@ fn compile_scripts(dev: &mut DevProxy) -> Result<Vec<BBChainScript>> {
     Ok(scripts)
 }
 
+fn build_bbchain_modules(dev: &mut DevProxy){
+    println!("\nBuilding Modules ============================\n");
+    let modules = vec![
+        BBChainModules{
+            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+            deps : vec![
+                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
+            ] 
+        },
+        BBChainModules{
+            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
+            deps : vec![
+                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
+            ] 
+        },
+        BBChainModules{
+            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
+            deps : vec![
+                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
+            ]
+        },      
+    ];
+
+    // deploy modules
+    for f in &modules {
+        println!("\nCompiling : {}", f.path);
+        let compiled_path = dev.compile_source(f.path.clone(), f.deps.clone()).expect("Failed to compile");
+        println!("\nPublishing Now...");
+        dev.publish_module(&compiled_path).expect("Error publishing module");
+        println!("\n!! Published {} !!", f.path);
+    }
+    println!("\nCompleted Building Modules ============================ \n");
+}
+
 struct ClusterTestRunner {
     tx_emitter: TxEmitter,
     instances: Vec<Instance>,
@@ -187,7 +184,7 @@ struct ClusterTestRunner {
 
 impl ClusterTestRunner {
     /// Discovers cluster, setup log, etc
-    pub fn setup(args: &Args, compiled_scripts: Vec<BBChainScript>) -> Self {
+    pub fn setup(_args: &Args, compiled_scripts: Vec<BBChainScript>) -> Self {
         let tx_emitter = TxEmitter::new(compiled_scripts);
         let instances = setup_instances();
         let runtime = Builder::new()

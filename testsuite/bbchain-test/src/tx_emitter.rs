@@ -182,9 +182,9 @@ impl TxEmitter {
 
         let account_per_org = (NUM_FACULTIES * NUM_COURSES) + 1; // including organization
         let owner_accounts = NUM_OWNERS_PER_COURSE * NUM_COURSES;
-        let holder_account = (NUM_COURSES * NUM_STUDENTS_PER_COURSE);
+        let holder_account = NUM_COURSES * NUM_STUDENTS_PER_COURSE;
 
-        let total_account_per_org = account_per_org + owner_accounts + holder_account;
+        let _total_account_per_org = account_per_org + owner_accounts + holder_account;
     
         println!("Accounts per org : {}", account_per_org);
         println!("Owners per org : {}", account_per_org);
@@ -254,7 +254,7 @@ impl TxEmitter {
 
     pub async fn get_bbchain_account(&mut self, instances: Vec<Instance>) -> Result<AccountData>{
         let instance = self.pick_mint_instance(&instances);
-        let mut faucet_account = self.load_faucet_account(&instance).await?;
+        let faucet_account = self.load_faucet_account(&instance).await?;
 
         Ok(faucet_account)
     }
@@ -499,19 +499,19 @@ impl SubmissionWorker {
         };
 
         // gen requests to create organization structure
-        for org_index in 0..NUM_ORG {
+        for _org_index in 0..NUM_ORG {
             println!("Remaining accounts : {}", self.accounts.len());
             let (mut org_account, request) = self.build_issuer_request();
             requests.push(request);
             
             // build faculty
-            for faculty_index in 0..NUM_FACULTIES{
+            for _faculty_index in 0..NUM_FACULTIES{
                 println!("Remaining accounts : {}", self.accounts.len());
-                let (fac_account, fac_owners_account, request) = self.build_sub_issuer_request(&org_account);
+                let (fac_account, _fac_owners_account, request) = self.build_sub_issuer_request(&org_account);
                 requests.push(request);
 
                 // build course
-                for course_index in 0..NUM_COURSES{
+                for _course_index in 0..NUM_COURSES{
                     println!("Remaining accounts : {}", self.accounts.len());
                     let (mut course_account, mut course_owners_accounts, request) = self.build_sub_issuer_request(&fac_account);
                     requests.push(request);
@@ -519,7 +519,7 @@ impl SubmissionWorker {
                     let mut course_digests:Vec<String> = Vec::new();
 
                     // register student to org/course
-                    for student_index in 0..NUM_STUDENTS_PER_COURSE{
+                    for _student_index in 0..NUM_STUDENTS_PER_COURSE{
                         println!("Remaining accounts : {}", self.accounts.len());
                         // create CA
                         let (mut std_account, request) = self.build_holder_init_request(&org_account);
@@ -529,7 +529,7 @@ impl SubmissionWorker {
                         requests.push(request);
 
                         // register credential for student
-                        for credential_index in 0..NUM_COURSE_WORKS{
+                        for _credential_index in 0..NUM_COURSE_WORKS{
                             let digest = self.generate_credential();
 
                             let request = self.build_holder_digest_registration_request(&mut course_account, &std_account, digest.clone());
@@ -572,8 +572,8 @@ impl SubmissionWorker {
         requests
     }
 
-    fn build_verify_digest_request(&mut self,mut verifier_account: &mut AccountData, mut course_account: &mut AccountData, mut std_account: &mut AccountData, digest: String) -> SignedTransaction {    
-        let mut arguments = vec![
+    fn build_verify_digest_request(&mut self,mut verifier_account: &mut AccountData, course_account: &mut AccountData, std_account: &mut AccountData, digest: String) -> SignedTransaction {    
+        let arguments = vec![
             digest,
             course_account.address.to_string(),
             std_account.address.to_string(),
@@ -589,8 +589,8 @@ impl SubmissionWorker {
     }
     
 
-    fn build_aggregate_credential_proof_request(&mut self,mut org_account: &mut AccountData, mut std_account: &mut AccountData ) -> SignedTransaction {    
-        let mut arguments = vec![
+    fn build_aggregate_credential_proof_request(&mut self,mut org_account: &mut AccountData, std_account: &mut AccountData ) -> SignedTransaction {    
+        let arguments = vec![
             std_account.address.to_string(),
         ];
 
@@ -603,8 +603,8 @@ impl SubmissionWorker {
         request
     }
 
-    fn build_claim_credential_proof_request(&mut self,mut course_account: &mut AccountData, mut std_account: &mut AccountData ) -> SignedTransaction {    
-        let mut arguments = vec![
+    fn build_claim_credential_proof_request(&mut self,course_account: &mut AccountData, mut std_account: &mut AccountData ) -> SignedTransaction {    
+        let arguments = vec![
             course_account.address.to_string(),
         ];
 
@@ -617,8 +617,8 @@ impl SubmissionWorker {
         request
     }
 
-    fn build_sign_credential_request(&mut self,mut course_account: &mut AccountData, mut owner_account: &mut AccountData, digest: String ) -> SignedTransaction {    
-        let mut arguments = vec![
+    fn build_sign_credential_request(&mut self,course_account: &mut AccountData, mut owner_account: &mut AccountData, digest: String ) -> SignedTransaction {    
+        let arguments = vec![
             course_account.address.to_string(),
             digest,
         ];
@@ -633,7 +633,7 @@ impl SubmissionWorker {
     }
 
     fn build_holder_digest_registration_request(&mut self,mut course_account: &mut AccountData, std_account: &AccountData, digest: String ) -> SignedTransaction {    
-        let mut arguments = vec![
+        let arguments = vec![
             std_account.address.to_string(),
             digest,
         ];
@@ -655,7 +655,7 @@ impl SubmissionWorker {
     }
 
     fn build_holder_registration_request(&mut self,mut course_account: &mut AccountData, std_account: &AccountData ) -> SignedTransaction {    
-        let mut arguments = vec![
+        let arguments = vec![
             std_account.address.to_string(),
         ];
 
@@ -674,7 +674,7 @@ impl SubmissionWorker {
                 None => panic!("failed to get org account"),
             };
         
-        let mut arguments = vec![
+        let arguments = vec![
             root_issuer.address.to_string(),
         ];
 
@@ -697,7 +697,7 @@ impl SubmissionWorker {
         println!("owners total {}",owners.len());
         
         //script handles 2 owners, can be extended but good enough for testing
-        let mut arguments = vec![
+        let arguments = vec![
             parent_issuer.address.to_string(),
             owners[0].address.to_string(),
             owners[1].address.to_string(),
@@ -777,7 +777,7 @@ impl SubmissionWorker {
     fn get_bbchain_compiled_script_path(&self, script_desc: &str, compiled_scripts: &Vec<BBChainScript>) -> usize {
         let mut i:usize = 0;
         for script in compiled_scripts {
-            if(&script.desc == script_desc){
+            if &script.desc == script_desc {
                 println!("Found script for {}",script_desc);
                 return i;
             }

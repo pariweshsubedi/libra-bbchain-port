@@ -1,6 +1,6 @@
 // Copyright (c) The Libra Core Contributors
 // SPDX-License-Identifier: Apache-2.0
-use cli::{client_proxy::ClientProxy, commands};
+
 use std::{
     collections::HashMap,
     io::{self, Write},
@@ -10,7 +10,7 @@ use std::{
     fs::{self, File},
 };
 use crate::tx_emitter::TxEmitter;
-use libra_temppath::TempPath;
+
 
 pub struct InteractiveClient {
     client: Option<Child>,
@@ -42,7 +42,7 @@ impl Drop for InteractiveClient {
 impl InteractiveClient {
     pub fn new_with_inherit_io(
         port: u16,
-        mnemonic_file_path: &Path,
+        _mnemonic_file_path: &Path,
         waypointStr : &str
     ) -> Self {
         // We need to call canonicalize on the path because we are running client from
@@ -50,8 +50,8 @@ impl InteractiveClient {
         // running from that location, so if a relative path is passed, it wouldn't work
         // unless we convert it to an absolute path
         let keypair = TxEmitter::get_mint_key_pair();
-        let key_path = Path::new("/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/mint.key");
-        let serialized_keys = lcs::to_bytes(&keypair).expect("Unable to serialize keys");
+        let _key_path = Path::new("/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/mint.key");
+        let _serialized_keys = lcs::to_bytes(&keypair).expect("Unable to serialize keys");
 
         // fs::create_dir_all(output_dir).expect("Unable to create output directory");
         // let mut key_file = File::create(key_path).expect("Unable to create key file");

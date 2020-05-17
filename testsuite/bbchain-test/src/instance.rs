@@ -3,10 +3,10 @@
 
 #![forbid(unsafe_code)]
 
-use anyhow::{ensure, format_err, Result};
+
 use once_cell::sync::Lazy;
 use regex::Regex;
-use serde_json::Value;
+
 use std::{collections::HashSet, ffi::OsStr, fmt, process::Stdio};
 
 static VAL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"val-(\d+)").unwrap());
