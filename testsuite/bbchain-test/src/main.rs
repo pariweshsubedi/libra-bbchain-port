@@ -26,6 +26,7 @@ use libra_types::{
     waypoint::Waypoint,
 };
 use chrono::{DateTime, Utc};
+use dialoguer::{Confirm, Input};
 
 
 #[derive(StructOpt, Debug)]
@@ -38,6 +39,43 @@ struct Args {
 struct BBChainModules{
     pub path: String,
     pub deps: Vec<String>,
+}
+
+fn build_bbchain_modules(mut dev: &mut DevProxy){
+    println!("\nBuilding Modules ============================\n");
+    let modules = vec![
+        BBChainModules{
+            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+            deps : vec![
+                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
+            ] 
+        },
+        BBChainModules{
+            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
+            deps : vec![
+                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
+            ] 
+        },
+        BBChainModules{
+            path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
+            deps : vec![
+                "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
+                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
+                "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
+            ]
+        },      
+    ];
+
+    // deploy modules
+    for f in &modules {
+        println!("\nCompiling : {}", f.path);
+        let compiled_path = dev.compile_source(f.path.clone(), f.deps.clone()).expect("Failed to compile");
+        println!("\nPublishing Now...");
+        dev.publish_module(&compiled_path).expect("Error publishing module");
+        println!("\n!! Published {} !!", f.path);
+    }
+    println!("\nCompleted Building Modules ============================ \n");
 }
 
 pub fn main() {
@@ -57,58 +95,23 @@ pub fn main() {
 
     let mut dev = DevProxy::create(bbchain_account, waypoint).expect("Failed to construct dev proxy.");
 
-    // println!("Compile World");
-    // let modules = vec![
-    //     BBChainModules{
-    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-    //         deps : vec![
-    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string()
-    //         ] 
-    //     },
-    //     BBChainModules{
-    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string(),
-    //         deps : vec![
-    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-    //             "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string()
-    //         ] 
-    //     },
-    //     BBChainModules{
-    //         path : "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Issuer.move".to_string(),
-    //         deps : vec![
-    //             "/Users/pariweshsubedi/libra/language/stdlib/modules".to_string(),
-    //             "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/Proofs.move".to_string(),
-    //             "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/move/EarmarkedProofs.move".to_string()
-    //         ]
-    //     },      
-    // ];
+    // Deploy modules - needed the first time after the bbchain libra network is up
+    if Confirm::new().with_prompt("\n\nBuild/Deploy modules?").interact().unwrap(){
+        build_bbchain_modules(&mut dev);
+    } 
 
-    // // deploy modules
-    // for f in &modules {
-    //     println!("Compiling : {}", f.path);
-    //     let compiled_path = dev.compile_source(f.path.clone(), f.deps.clone()).expect("Failed to compile");
-    //     println!("Publishing Now...");
-    //     dev.publish_module(&compiled_path).expect("Error publishing module");
-    //     println!("!! Published !!");
-    // }
+    // compile scripts and run test
+    if Confirm::new().with_prompt("\n\nCompile scripts and run test transaction ?").interact().unwrap(){
+        let mut compiled_scripts = compile_scripts(&mut dev).expect("failed to compile scripts");
 
-
-    
-    let mut compiled_scripts = compile_scripts(&mut dev).expect("failed to compile scripts");
-
-    
-    // for script in &mut compiled_scripts {
-    //     println!("Executing : {}", script.compiled_path);
-    //     let arguments = vec![];
-    //     dev.execute_script(&*script.compiled_path, &arguments);
-    // }
-
-    
-    // run test
-    let mut runner = ClusterTestRunner::setup(&args,vec![]);
-    rt.block_on(runner.start_job(compiled_scripts.clone()));
+        let mut runner = ClusterTestRunner::setup(&args,vec![]);
+        rt.block_on(runner.start_job(compiled_scripts.clone()));
+    } 
     
     // start interactive client
-    // start_interactive(8080, waypoint);
+    if Confirm::new().with_prompt("\n\nStart Interactive Client ?").interact().unwrap(){
+        start_interactive(8080, waypoint);
+    }
 }
 
 fn compile_scripts(dev: &mut DevProxy) -> Result<Vec<BBChainScript>> {
@@ -262,9 +265,10 @@ fn setup_instances() -> Vec<Instance>{
 }
 
 fn setup_log() {
-    if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "info");
-    }
+    // if env::var("RUST_LOG").is_err() {
+    //     env::set_var("RUST_LOG", "info");
+    // }
+    env::set_var("RUST_BACKTRACE", "1");
     ::libra_logger::Logger::new().is_async(true).init();
 }
 
