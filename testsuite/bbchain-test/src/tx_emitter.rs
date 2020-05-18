@@ -61,12 +61,12 @@ const LIBRA_PER_NEW_ACCOUNT: u64 = 1_000_000_000;
 
 
 const NUM_ORG: usize = 1;
-const NUM_FACULTIES: usize = 2;
+const NUM_FACULTIES: usize = 1;
 const NUM_COURSES: usize = 1;
-const NUM_COURSE_WORKS: usize = 4;
-const NUM_OWNERS_PER_COURSE: usize = 2;
-const NUM_STUDENTS_PER_COURSE: usize = 1;
-const TOTAL_ACCOUNTS: usize = NUM_ORG * NUM_FACULTIES * NUM_COURSES * NUM_COURSE_WORKS;
+const NUM_COURSE_WORKS: usize = 2;
+const NUM_OWNERS_PER_COURSE: usize = 2; // using test
+const NUM_STUDENTS_PER_COURSE: usize = 5;
+const NUM_VERIFIERS: usize = 1;
 
 pub struct TxEmitter {
     accounts: Vec<AccountData>,
@@ -178,28 +178,22 @@ impl TxEmitter {
     }
 
     pub async fn start_job(&mut self, instances: Vec<Instance>) -> Result<EmitJob> {
+        let est_accounts_per_client = 6 +
+                                    (NUM_ORG *  NUM_FACULTIES) +
+                                    (NUM_FACULTIES * NUM_COURSES) +
+                                    (NUM_OWNERS_PER_COURSE * (NUM_ORG + NUM_FACULTIES + NUM_COURSES)) + 
+                                    (NUM_STUDENTS_PER_COURSE * NUM_COURSES)+ 
+                                    (NUM_VERIFIERS);
 
+        let accounts_per_client = est_accounts_per_client;//50;
 
-        let account_per_org = (NUM_FACULTIES * NUM_COURSES) + 1; // including organization
-        let owner_accounts = NUM_OWNERS_PER_COURSE * NUM_COURSES;
-        let holder_account = NUM_COURSES * NUM_STUDENTS_PER_COURSE;
-
-        let _total_account_per_org = account_per_org + owner_accounts + holder_account;
-    
-        println!("Accounts per org : {}", account_per_org);
-        println!("Owners per org : {}", account_per_org);
-        println!("Holder account per org : {}", holder_account);
-       
-        let accounts_per_client = 30;
-        let num_clients = 1;
-        let num_accounts = accounts_per_client * num_clients;
+        let num_accounts = (NUM_ORG * accounts_per_client);
         
         println!(
-            "Will create {} accounts_per_client with total {} accounts",
-            accounts_per_client, num_accounts
+            "Will create {} accounts_per_client with total {} accounts. Estimate is {}",
+            accounts_per_client, num_accounts, est_accounts_per_client
         );
         self.mint_accounts(num_accounts, instances.clone()).await?;
-
         
         let all_accounts = self.accounts.split_off(self.accounts.len() - num_accounts);
         let all_addresses: Vec<_> = all_accounts.iter().map(|d| d.address).collect();
@@ -211,12 +205,8 @@ impl TxEmitter {
         let mut workers = vec![];
         let workers_per_ac = 1;
 
-        println!("All addresses: {:?}", all_addresses);
+        // println!("All addresses: {:?}", all_addresses);
 
-        // build organization structure
-        // let test_organization_structure = init_org(all_accounts);
-
-        
         for instance in &instances {
             println!("Instance loop");
             for _ in 0..workers_per_ac {
@@ -499,72 +489,70 @@ impl SubmissionWorker {
         };
 
         // gen requests to create organization structure
-        for _org_index in 0..NUM_ORG {
+        println!("Remaining accounts : {}", self.accounts.len());
+        let (mut org_account, request) = self.build_issuer_request();
+        requests.push(request);
+        
+        // build faculty
+        for _faculty_index in 0..NUM_FACULTIES{
             println!("Remaining accounts : {}", self.accounts.len());
-            let (mut org_account, request) = self.build_issuer_request();
+            let (fac_account, _fac_owners_account, request) = self.build_sub_issuer_request(&org_account);
             requests.push(request);
-            
-            // build faculty
-            for _faculty_index in 0..NUM_FACULTIES{
+
+            // build course
+            for _course_index in 0..NUM_COURSES{
                 println!("Remaining accounts : {}", self.accounts.len());
-                let (fac_account, _fac_owners_account, request) = self.build_sub_issuer_request(&org_account);
+                let (mut course_account, mut course_owners_accounts, request) = self.build_sub_issuer_request(&fac_account);
                 requests.push(request);
 
-                // build course
-                for _course_index in 0..NUM_COURSES{
+                let mut course_digests:Vec<String> = Vec::new();
+
+                // register student to org/course
+                for _student_index in 0..NUM_STUDENTS_PER_COURSE{
                     println!("Remaining accounts : {}", self.accounts.len());
-                    let (mut course_account, mut course_owners_accounts, request) = self.build_sub_issuer_request(&fac_account);
+                    // create CA
+                    let (mut std_account, request) = self.build_holder_init_request(&org_account);
                     requests.push(request);
 
-                    let mut course_digests:Vec<String> = Vec::new();
+                    let request = self.build_holder_registration_request(&mut course_account, &std_account);
+                    requests.push(request);
 
-                    // register student to org/course
-                    for _student_index in 0..NUM_STUDENTS_PER_COURSE{
-                        println!("Remaining accounts : {}", self.accounts.len());
-                        // create CA
-                        let (mut std_account, request) = self.build_holder_init_request(&org_account);
+                    // register credential for student
+                    for _credential_index in 0..NUM_COURSE_WORKS{
+                        let digest = self.generate_credential();
+
+                        let request = self.build_holder_digest_registration_request(&mut course_account, &std_account, digest.clone());
                         requests.push(request);
-
-                        let request = self.build_holder_registration_request(&mut course_account, &std_account);
-                        requests.push(request);
-
-                        // register credential for student
-                        for _credential_index in 0..NUM_COURSE_WORKS{
-                            let digest = self.generate_credential();
-
-                            let request = self.build_holder_digest_registration_request(&mut course_account, &std_account, digest.clone());
-                            requests.push(request);
-                            
-                            // println!("Digest Created : {}", digest);
-                            course_digests.push(digest);
-                        }
-
-                        // sign the registered credential as course owners
-                        for owmer_index in 0..NUM_OWNERS_PER_COURSE{
-                            for sign_cred_index in 0..course_digests.len(){
-                                let request = self.build_sign_credential_request(&mut course_account, &mut course_owners_accounts[owmer_index] ,course_digests[sign_cred_index].clone());
-                                requests.push(request);
-                            }
-                        }
-
-                        // student claims the credential proof()
-                        let request = self.build_claim_credential_proof_request(&mut course_account, &mut std_account);
-                        requests.push(request);
-
-                        // as a root issuer student credentials are all aggregated to provide final aggregation
-                        let request = self.build_aggregate_credential_proof_request(&mut org_account, &mut std_account);
-                        requests.push(request);
-
-
-                        // verifier verifies digest
-                        for digest_index in 0..course_digests.len(){
-                            let request = self.build_verify_digest_request(&mut verifier_account, &mut course_account, &mut std_account, course_digests[digest_index].clone());
-                            requests.push(request);
-                        }
-
-                        // TODO : merge course digests with digests
-                        digests.extend_from_slice(&course_digests);
+                        
+                        // println!("Digest Created : {}", digest);
+                        course_digests.push(digest);
                     }
+
+                    // sign the registered credential as course owners
+                    for owmer_index in 0..NUM_OWNERS_PER_COURSE{
+                        for sign_cred_index in 0..course_digests.len(){
+                            let request = self.build_sign_credential_request(&mut course_account, &mut course_owners_accounts[owmer_index] ,course_digests[sign_cred_index].clone());
+                            requests.push(request);
+                        }
+                    }
+
+                    // student claims the credential proof()
+                    let request = self.build_claim_credential_proof_request(&mut course_account, &mut std_account);
+                    requests.push(request);
+
+                    // as a root issuer student credentials are all aggregated to provide final aggregation
+                    let request = self.build_aggregate_credential_proof_request(&mut org_account, &mut std_account);
+                    requests.push(request);
+
+
+                    // verifier verifies digest
+                    for digest_index in 0..course_digests.len(){
+                        let request = self.build_verify_digest_request(&mut verifier_account, &mut course_account, &mut std_account, course_digests[digest_index].clone());
+                        requests.push(request);
+                    }
+
+                    // TODO : merge course digests with digests
+                    digests.extend_from_slice(&course_digests);
                 }
             }
         }
