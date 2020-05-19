@@ -64,7 +64,7 @@ const NUM_ORG: usize = 1;
 const NUM_FACULTIES: usize = 1;
 const NUM_COURSES: usize = 1;
 const NUM_COURSE_WORKS: usize = 2;
-const NUM_OWNERS_PER_COURSE: usize = 2; // using test
+const NUM_OWNERS_PER_COURSE: usize = 2; // using 2 for test
 const NUM_STUDENTS_PER_COURSE: usize = 5;
 const NUM_VERIFIERS: usize = 1;
 
@@ -205,7 +205,7 @@ impl TxEmitter {
         let mut workers = vec![];
         let workers_per_ac = 1;
 
-        // println!("All addresses: {:?}", all_addresses);
+        println!("All addresses: {:?}", all_addresses);
 
         for instance in &instances {
             println!("Instance loop");
@@ -434,7 +434,7 @@ impl SubmissionWorker {
     async fn run(mut self) -> Vec<AccountData> {
         println!("Worker started");
         let wait = Duration::from_millis(self.params.wait_millis);
-        // while !self.stop.load(Ordering::Relaxed) {
+        while !self.stop.load(Ordering::Relaxed) {
             println!("Generating requests ....");
             // let requests = self.gen_requests();
             let requests = self.build_requests();
@@ -472,7 +472,7 @@ impl SubmissionWorker {
                         .fetch_add(num_requests as u64, Ordering::Relaxed);
                 }
             }
-        // }
+        }
         self.accounts
     }
 
@@ -502,7 +502,7 @@ impl SubmissionWorker {
             // build course
             for _course_index in 0..NUM_COURSES{
                 println!("Remaining accounts : {}", self.accounts.len());
-                let (mut course_account, mut course_owners_accounts, request) = self.build_sub_issuer_request(&fac_account);
+                let (mut course_account, mut course_owners_accounts, request) = self.build_sub_issuer_request(&org_account);
                 requests.push(request);
 
                 let mut course_digests:Vec<String> = Vec::new();
@@ -518,8 +518,8 @@ impl SubmissionWorker {
                     requests.push(request);
 
                     // register credential for student
-                    for _credential_index in 0..NUM_COURSE_WORKS{
-                        let digest = self.generate_credential();
+                    for credential_index in 0..NUM_COURSE_WORKS{
+                        let digest = self.generate_credential(credential_index);
 
                         let request = self.build_holder_digest_registration_request(&mut course_account, &std_account, digest.clone());
                         requests.push(request);
@@ -635,9 +635,9 @@ impl SubmissionWorker {
         request
     }
 
-    fn generate_credential(&mut self) -> String{
+    fn generate_credential(&mut self, digest_count: usize) -> String{
         // let random_bytes: Vec<u8> = (0..255).map(|_| { rand::random::<u8>() }).collect();
-        let byte_string = "b\"credential\"".to_string();
+        let byte_string = format!("b\"0000000{}\"", digest_count).to_string();
         // let byte_string = random_bytes.iter().map(|&c| c as char).collect::<String>();
         byte_string
     }
