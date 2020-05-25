@@ -256,8 +256,15 @@ fn get_waypoint(client: &mut DevProxy) {
 
 fn setup_instances() -> Vec<Instance>{
     let mut instances = Vec::new();
-    let instance1 = Instance::new("bbchain1".to_string(), "localhost".to_string(), 8080);
+    let instance1 = Instance::new("val1".to_string(), "localhost".to_string(), 8080);
     instances.push(instance1);
+    
+    let instance2 = Instance::new("val2".to_string(), "localhost".to_string(), 8081);
+    instances.push(instance2);
+
+    let instance3 = Instance::new("val3".to_string(), "localhost".to_string(), 8082);
+    instances.push(instance3);
+    
     return instances;
 }
 

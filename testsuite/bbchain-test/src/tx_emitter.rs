@@ -65,7 +65,7 @@ const NUM_FACULTIES: usize = 1;
 const NUM_COURSES: usize = 1;
 const NUM_COURSE_WORKS: usize = 2;
 const NUM_OWNERS_PER_COURSE: usize = 2; // using 2 for test
-const NUM_STUDENTS_PER_COURSE: usize = 5;
+const NUM_STUDENTS_PER_COURSE: usize = 3;
 const NUM_VERIFIERS: usize = 1;
 
 pub struct TxEmitter {
@@ -97,7 +97,7 @@ pub struct EmitThreadParams {
 impl Default for EmitThreadParams {
     fn default() -> Self {
         Self {
-            wait_millis: 100,
+            wait_millis: 500,
             wait_committed: true,
         }
     }
@@ -187,7 +187,7 @@ impl TxEmitter {
 
         let accounts_per_client = est_accounts_per_client;//50;
 
-        let num_accounts = (NUM_ORG * accounts_per_client);
+        let num_accounts = NUM_ORG * accounts_per_client * instances.len();
         
         println!(
             "Will create {} accounts_per_client with total {} accounts. Estimate is {}",
@@ -452,7 +452,11 @@ impl SubmissionWorker {
                     time::delay_for(wait_util - now).await;
                 }
             }
+
+            println!("Requests submitted");
+
             if self.params.wait_committed {
+                println!("Wait for comitted");
                 if let Err(uncommitted) =
                     wait_for_accounts_sequence(&self.client, &mut self.accounts).await
                 {
