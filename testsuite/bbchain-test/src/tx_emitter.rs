@@ -54,18 +54,18 @@ use util::retry;
 
 const MAX_TXN_BATCH_SIZE: usize = 100; // Max transactions per account in mempool
 const MAX_GAS_AMOUNT: u64 = 1_000_000;
-const GAS_UNIT_PRICE: u64 = 0;
+const GAS_UNIT_PRICE: u64 = 1;
 const TXN_EXPIRATION_SECONDS: i64 = 50;
 const TXN_MAX_WAIT: Duration = Duration::from_secs(TXN_EXPIRATION_SECONDS as u64 + 30);
 const LIBRA_PER_NEW_ACCOUNT: u64 = 1_000_000_000;
 
 
-const NUM_ORG: usize = 1;
+const NUM_ORG: usize = 3;
 const NUM_FACULTIES: usize = 1;
 const NUM_COURSES: usize = 1;
-const NUM_COURSE_WORKS: usize = 2;
+const NUM_COURSE_WORKS: usize = 1;
 const NUM_OWNERS_PER_COURSE: usize = 2; // using 2 for test
-const NUM_STUDENTS_PER_COURSE: usize = 3;
+const NUM_STUDENTS_PER_COURSE: usize = 1;
 const NUM_VERIFIERS: usize = 1;
 
 pub struct TxEmitter {
@@ -97,7 +97,7 @@ pub struct EmitThreadParams {
 impl Default for EmitThreadParams {
     fn default() -> Self {
         Self {
-            wait_millis: 500,
+            wait_millis: 50,
             wait_committed: true,
         }
     }
@@ -185,8 +185,9 @@ impl TxEmitter {
                                     (NUM_STUDENTS_PER_COURSE * NUM_COURSES)+ 
                                     (NUM_VERIFIERS);
 
-        let accounts_per_client = est_accounts_per_client;//50;
-
+        // let accounts_per_client = est_accounts_per_client;
+        let accounts_per_client = 100;
+        
         let num_accounts = NUM_ORG * accounts_per_client * instances.len();
         
         println!(
@@ -218,6 +219,8 @@ impl TxEmitter {
                 let params = EmitThreadParams::default();
                 let stats = Arc::clone(&stats);
                 let compiled_scripts = self.compiled_scripts.clone();
+
+                // build oganization structure
                 let worker = SubmissionWorker {
                     accounts,
                     client,
@@ -228,11 +231,8 @@ impl TxEmitter {
                     compiled_scripts
                 };
 
-                println!("worker created");
                 let join_handle = tokio_handle.spawn(worker.run().boxed());
-                println!("join handle ran");
                 workers.push(Worker { join_handle });
-                println!("pushed worker");
             }
         }
         Ok(EmitJob {
@@ -434,11 +434,15 @@ impl SubmissionWorker {
     async fn run(mut self) -> Vec<AccountData> {
         println!("Worker started");
         let wait = Duration::from_millis(self.params.wait_millis);
-        while !self.stop.load(Ordering::Relaxed) {
+        // while !self.stop.load(Ordering::Relaxed) {
             println!("Generating requests ....");
             // let requests = self.gen_requests();
-            let requests = self.build_requests();
-            println!("Generated requests");
+            let mut requests = self.build_org_requests();
+            for _ in 0..(NUM_ORG-1) {
+                let req = self.build_org_requests();
+                requests.extend_from_slice(&req);
+            }
+            println!("Generated requests. Total requests length =  {}", requests.len().to_string());
             let num_requests = requests.len();
             for request in requests {
                 self.stats.submitted.fetch_add(1, Ordering::Relaxed);
@@ -476,12 +480,12 @@ impl SubmissionWorker {
                         .fetch_add(num_requests as u64, Ordering::Relaxed);
                 }
             }
-        }
+        // }
         self.accounts
     }
 
     // builds ordered vector or requests to simulate bbchain workflow
-    fn build_requests(&mut self) -> Vec<SignedTransaction>{
+    fn build_org_requests(&mut self) -> Vec<SignedTransaction>{
         let mut requests = Vec::new();
 
         let mut digests:Vec<String> = Vec::new();
@@ -492,10 +496,14 @@ impl SubmissionWorker {
             None => panic!("failed to get verifier account"),
         };
 
+        println!("Verifier account : {}", verifier_account.address.to_string());
+
         // gen requests to create organization structure
         println!("Remaining accounts : {}", self.accounts.len());
         let (mut org_account, request) = self.build_issuer_request();
         requests.push(request);
+        
+        println!("Org account : {}", org_account.address.to_string());
         
         // build faculty
         for _faculty_index in 0..NUM_FACULTIES{
@@ -503,11 +511,15 @@ impl SubmissionWorker {
             let (fac_account, _fac_owners_account, request) = self.build_sub_issuer_request(&org_account);
             requests.push(request);
 
+            println!("Faculty account : {}", fac_account.address.to_string());
+
             // build course
             for _course_index in 0..NUM_COURSES{
                 println!("Remaining accounts : {}", self.accounts.len());
                 let (mut course_account, mut course_owners_accounts, request) = self.build_sub_issuer_request(&org_account);
                 requests.push(request);
+
+                println!("Course account : {}", course_account.address.to_string());
 
                 let mut course_digests:Vec<String> = Vec::new();
 
@@ -517,6 +529,7 @@ impl SubmissionWorker {
                     // create CA
                     let (mut std_account, request) = self.build_holder_init_request(&org_account);
                     requests.push(request);
+                    println!("Student account : {}", std_account.address.to_string());
 
                     let request = self.build_holder_registration_request(&mut course_account, &std_account);
                     requests.push(request);
@@ -536,6 +549,7 @@ impl SubmissionWorker {
                     for owmer_index in 0..NUM_OWNERS_PER_COURSE{
                         for sign_cred_index in 0..course_digests.len(){
                             let request = self.build_sign_credential_request(&mut course_account, &mut course_owners_accounts[owmer_index] ,course_digests[sign_cred_index].clone());
+                            println!("Owner account : {}", course_owners_accounts[owmer_index].address.to_string());
                             requests.push(request);
                         }
                     }

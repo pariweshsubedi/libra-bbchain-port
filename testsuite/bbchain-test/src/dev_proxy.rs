@@ -56,7 +56,7 @@ enum InputType {
 }
 
 const CLIENT_WALLET_MNEMONIC_FILE: &str = "client.mnemonic";
-const GAS_UNIT_PRICE: u64 = 0;
+const GAS_UNIT_PRICE: u64 = 1;
 const MAX_GAS_AMOUNT: u64 = 1_000_000;
 const TX_EXPIRATION: i64 = 100;
 

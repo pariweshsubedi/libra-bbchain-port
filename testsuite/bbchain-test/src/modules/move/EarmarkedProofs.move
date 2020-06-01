@@ -1,3 +1,4 @@
+address 0x0000000000000000000000000a550c18:
 module EarmarkedProofs {
     use 0x0000000000000000000000000a550c18::Proofs;
     use 0x0::Transaction;
@@ -16,9 +17,7 @@ module EarmarkedProofs {
     // A wrapper containing a Libra coin and the address of the recipient the
     // coin is earmarked for.
     resource struct LoggedProofs {
-        owners : vector<address>,
-        credential_proofs: vector<Proofs::CredentialProof>,
-        credentials: vector<Proofs::Credential>
+        owners : vector<address>,credential_proofs: vector<Proofs::CredentialProof>,credentials: vector<Proofs::Credential>
     }
 
     resource struct DigestHolderProofs {

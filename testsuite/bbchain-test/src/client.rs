@@ -11,7 +11,6 @@ use std::{
 };
 use crate::tx_emitter::TxEmitter;
 
-
 pub struct InteractiveClient {
     client: Option<Child>,
 }
@@ -50,14 +49,16 @@ impl InteractiveClient {
         // running from that location, so if a relative path is passed, it wouldn't work
         // unless we convert it to an absolute path
         let keypair = TxEmitter::get_mint_key_pair();
-        let _key_path = Path::new("/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/mint.key");
-        let _serialized_keys = lcs::to_bytes(&keypair).expect("Unable to serialize keys");
+        let key_path = Path::new("/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/mint.key");
+        let serialized_keys = lcs::to_bytes(&keypair).expect("Unable to serialize keys");
 
-        // fs::create_dir_all(output_dir).expect("Unable to create output directory");
-        // let mut key_file = File::create(key_path).expect("Unable to create key file");
-        // key_file
-        //     .write_all(&serialized_keys)
-        //     .expect("Unable to write to key file");
+        let output_dir = "/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules";
+
+        fs::create_dir_all(output_dir).expect("Unable to create output directory");
+        let mut key_file = File::create(key_path).expect("Unable to create key file");
+        key_file
+            .write_all(&serialized_keys)
+            .expect("Unable to write to key file");
         
         // cargo run -p cli --bin cli -- -u http://localhost:8080
         println!("{}",workspace_builder::workspace_root().display());
@@ -67,13 +68,13 @@ impl InteractiveClient {
                     .current_dir(workspace_builder::workspace_root())
                     .arg("-u")
                     .arg(format!("http://localhost:{}", port))
-                    // .arg("-m")
-                    // .arg("/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/mint.key")
+                    .arg("-m")
+                    .arg("/Users/pariweshsubedi/libra/testsuite/bbchain-test/src/modules/mint.key")
                     .arg("--waypoint")
                     .arg(waypointStr)
                     .stdin(Stdio::inherit())
-                    // .stdout(Stdio::inherit())
-                    // .stderr(Stdio::inherit())
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
                     .spawn()
                     .expect("Failed to spawn client process"),
             ),

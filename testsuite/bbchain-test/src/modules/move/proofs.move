@@ -1,3 +1,4 @@
+address 0x0000000000000000000000000a550c18:
 module Proofs {
     use 0x0::Transaction;
     use 0x0::Vector;
