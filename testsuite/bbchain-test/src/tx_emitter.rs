@@ -60,8 +60,8 @@ const TXN_MAX_WAIT: Duration = Duration::from_secs(TXN_EXPIRATION_SECONDS as u64
 const LIBRA_PER_NEW_ACCOUNT: u64 = 1_000_000_000;
 
 
-const NUM_ORG: usize = 3;
-const NUM_FACULTIES: usize = 1;
+const NUM_ORG: usize = 10;
+const NUM_FACULTIES: usize = 2;
 const NUM_COURSES: usize = 1;
 const NUM_COURSE_WORKS: usize = 1;
 const NUM_OWNERS_PER_COURSE: usize = 2; // using 2 for test
@@ -186,7 +186,7 @@ impl TxEmitter {
                                     (NUM_VERIFIERS);
 
         // let accounts_per_client = est_accounts_per_client;
-        let accounts_per_client = 100;
+        let accounts_per_client = 500;
         
         let num_accounts = NUM_ORG * accounts_per_client * instances.len();
         
