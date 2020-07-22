@@ -1,6 +1,6 @@
 
 This project is adopted from the libra-1.0.1 (https://github.com/libra/libra) to publish modules and run arbitrary transaction script as the default setting. 
-It primarily includes a custom rust package to test custom libra modules developed for document verification in libra blockchain.
+It primarily includes a custom rust package to test custom Libra modules with examples of modules and scripts that builds a credential verification application in libra blockchain.
 
 # BBchain testsuite 
 After [starting a Libra network](https://github.com/pariweshsubedi/libra-kubernetes-document-verification), the `bbchain-test` package present under [testsuite/bbchain-test](https://github.com/pariweshsubedi/libra-bbchain-port/tree/master/testsuite/bbchain-test) can be used to publish modules, scripts and run performance test in your libra network. The bbchain testsuite can be triggered using:
