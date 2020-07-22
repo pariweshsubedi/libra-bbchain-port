@@ -24,4 +24,4 @@ Transaction scripts are included under [testsuite/bbchain-test/src/modules/scrip
 Please refer to https://github.com/pariweshsubedi/libra-kubernetes-document-verification
 
 # Note for testing other custom modules 
-The `bbchain-test` package can be modified to test and publish any custom modules/scripts by defining path to their source and dependencies. 
+The `bbchain-test` package can be modified to publish any custom modules/scripts by defining path to their source and dependencies. 
