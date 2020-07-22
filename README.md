@@ -3,7 +3,7 @@ This project is adopted from the libra-1.0.1 (https://github.com/libra/libra) to
 It primarily includes a custom rust package to test custom libra modules developed for document verification in libra blockchain.
 
 # BBchain testsuite 
-After hosting a Libra network, the `bbchain-test` package present under [testsuite/bbchain-test](https://github.com/pariweshsubedi/libra-bbchain-port/tree/master/testsuite/bbchain-test) can be used to publish modules, scripts and run performance test in your libra network. The bbchain testsuite can be triggered using:
+After [starting a Libra network](https://github.com/pariweshsubedi/libra-kubernetes-document-verification), the `bbchain-test` package present under [testsuite/bbchain-test](https://github.com/pariweshsubedi/libra-bbchain-port/tree/master/testsuite/bbchain-test) can be used to publish modules, scripts and run performance test in your libra network. The bbchain testsuite can be triggered using:
 
 ```
 cargo run -p bbchain-test
